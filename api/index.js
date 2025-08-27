@@ -65,7 +65,8 @@ export default function handler(req, res) {
           id: user.id,
           name: user.name,
           role: user.role,
-          email: loginField
+          email: loginField,
+          username: loginField
         });
       }
     }
