@@ -1,5 +1,4 @@
 {
-  "outputDirectory": "dist/public",
   "functions": {
     "api/index.js": {
       "maxDuration": 10
