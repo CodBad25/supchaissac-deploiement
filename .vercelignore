@@ -54,7 +54,7 @@ client/dist/
 server/dist/
 
 # Fichiers TypeScript source (on garde seulement le JS compilé)
-server/*.ts
+# server/*.ts - COMMENTÉ pour permettre le build
 !server/index.js
 shared/*.ts
 client/src/
