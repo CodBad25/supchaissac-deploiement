@@ -30,9 +30,9 @@ scripts/
 # Configuration locale
 docker-compose*.yml
 tsconfig*.json
-vite.config.ts
-tailwind.config.ts
-postcss.config.js
+vite.config.*
+tailwind.config.*
+postcss.config.*
 
 # Anciennes versions
 ANCIENNES-VERSIONS-*
