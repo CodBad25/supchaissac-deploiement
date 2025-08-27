@@ -1,6 +1,6 @@
 {
   "name": "supchaissac",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "license": "MIT",
   "scripts": {
     "dev": "tsx server/index.ts",
@@ -10,7 +10,7 @@
     "check": "tsc",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "vercel-build": "npx vite build && npx esbuild ./server/index.ts --platform=node --bundle --format=esm --outfile=dist/server/index.js",
+    "vercel-build": "npx vite build && npx esbuild ./server/index.ts --platform=node --bundle --format=esm --outfile=dist/server/index.js --external:vite --external:@shared/schema --external:@shared/schema-pg",
     "render-build": "node scripts/render-build.js",
     "health-check": "tsx scripts/test-db-connection.js",
     "lint": "echo 'Linting not configured yet'",
