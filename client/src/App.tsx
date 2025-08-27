@@ -7,7 +7,7 @@ import { SecretaryView } from "@/components/secretary/SecretaryComponents";
 import { AdminView } from "@/components/admin/AdminComponents";
 import { TeacherView } from "@/components/teacher/TeacherComponents";
 import { Button } from "@/components/ui/button";
-import { AuthProvider } from "@/hooks/use-auth";
+import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import AuthPage from "@/pages/auth-page";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { queryClient } from "@/lib/queryClient";
@@ -76,12 +76,12 @@ function AdminInterface() {
 
 // Application principale basée sur le rôle de l'utilisateur
 function MainApp() {
-  const { user } = useUserRole();
-  
+  const { user } = useAuth();
+
   if (!user) {
     return <div className="flex items-center justify-center min-h-screen">Chargement...</div>;
   }
-  
+
   return (
     <>
       <RoleDisplay />
@@ -139,7 +139,5 @@ function RoleDisplay() {
     </div>
   );
 }
-
-import { useAuth } from "@/hooks/use-auth";
 
 export default App;

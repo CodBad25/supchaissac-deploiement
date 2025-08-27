@@ -25,8 +25,18 @@ export default function handler(req, res) {
 
   // Route pour vérifier l'utilisateur connecté
   if (method === 'GET' && url === '/api/user') {
-    // Pour Vercel, on ne peut pas maintenir de session
-    // On retourne null pour forcer la connexion
+    // Pour Vercel, on utilise un token simple dans les headers
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      // Décoder le token simple (base64)
+      try {
+        const userData = JSON.parse(Buffer.from(token, 'base64').toString());
+        return res.status(200).json(userData);
+      } catch (e) {
+        return res.status(401).json({ message: 'Token invalide' });
+      }
+    }
     return res.status(401).json({ message: 'Non connecté' });
   }
 
@@ -61,12 +71,20 @@ export default function handler(req, res) {
 
       const user = users[loginField];
       if (user) {
-        return res.status(200).json({
+        const userData = {
           id: user.id,
           name: user.name,
           role: user.role,
           email: loginField,
           username: loginField
+        };
+
+        // Créer un token simple (base64)
+        const token = Buffer.from(JSON.stringify(userData)).toString('base64');
+
+        return res.status(200).json({
+          ...userData,
+          token: token
         });
       }
     }
