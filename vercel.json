@@ -1,0 +1,18 @@
+{
+  "outputDirectory": "dist/public",
+  "functions": {
+    "dist/index.js": {
+      "maxDuration": 10
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/dist/index.js"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
