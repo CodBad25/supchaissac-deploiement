@@ -16,7 +16,7 @@ import {
   InsertTeacherSetup,
   SystemSetting,
   InsertSystemSetting
-} from "../shared/schema-sqlite";
+} from "@shared/schema-sqlite";
 import { IStorage } from "./storage";
 
 const MemoryStore = createMemoryStore(session);
