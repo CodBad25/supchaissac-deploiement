@@ -1,6 +1,7 @@
 {
   "name": "supchaissac",
-  "version": "1.6.1",
+  "version": "1.6.2",
+  "type": "module",
   "license": "MIT",
   "scripts": {
     "dev": "tsx server/index.ts",
