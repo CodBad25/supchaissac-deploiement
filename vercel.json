@@ -1,6 +1,4 @@
 {
-  "buildCommand": "npm run vercel-build",
-  "outputDirectory": "dist",
   "functions": {
     "api/index.js": {
       "maxDuration": 10
@@ -12,7 +10,7 @@
       "destination": "/api/index.js"
     },
     {
-      "source": "/",
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ]
