@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Convertisseur Pronote → SupChaissac</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .container { background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .step { background: white; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #007bff; }
+        .result { background: #d4edda; border-color: #28a745; }
+        .error { background: #f8d7da; border-color: #dc3545; }
+        textarea { width: 100%; height: 200px; font-family: monospace; font-size: 12px; }
+        button { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .download { background: #28a745; }
+        .download:hover { background: #1e7e34; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 11px; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Convertisseur Pronote → SupChaissac</h1>
+    
+    <div class="step">
+        <h3>📁 Étape 1: Sélectionner le fichier Pronote</h3>
+        <input type="file" id="fileInput" accept=".csv,.txt" />
+        <p><small>Sélectionnez le fichier CSV exporté depuis Pronote (même s'il semble corrompu)</small></p>
+    </div>
+    
+    <div class="step" id="analysisStep" style="display: none;">
+        <h3>🔍 Étape 2: Analyse du fichier</h3>
+        <div id="analysisResult"></div>
+    </div>
+    
+    <div class="step" id="conversionStep" style="display: none;">
+        <h3>⚙️ Étape 3: Conversion automatique</h3>
+        <button onclick="convertFile()">🚀 Convertir au format SupChaissac</button>
+        <div id="conversionResult"></div>
+    </div>
+    
+    <div class="step result" id="downloadStep" style="display: none;">
+        <h3>✅ Étape 4: Téléchargement</h3>
+        <button class="download" onclick="downloadConverted()">📥 Télécharger le fichier converti</button>
+        <div id="previewResult"></div>
+    </div>
+
+    <script>
+        let originalContent = '';
+        let convertedContent = '';
+        
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                originalContent = e.target.result;
+                analyzeFile();
+            };
+            reader.readAsText(file, 'UTF-8');
+        });
+        
+        function analyzeFile() {
+            const analysisDiv = document.getElementById('analysisResult');
+            const step = document.getElementById('analysisStep');
+            
+            // Analyser le contenu
+            const lines = originalContent.split('\n').filter(line => line.trim());
+            const firstLine = lines[0] || '';
+            const isPronoteEncoded = firstLine.includes('+ADs-');
+            
+            let html = `
+                <p><strong>Fichier analysé:</strong></p>
+                <ul>
+                    <li>Nombre de lignes: ${lines.length}</li>
+                    <li>Taille: ${originalContent.length} caractères</li>
+                    <li>Format Pronote encodé: ${isPronoteEncoded ? '✅ OUI' : '❌ NON'}</li>
+                </ul>
+                <p><strong>Début du fichier:</strong></p>
+                <pre>${firstLine.substring(0, 200)}...</pre>
+            `;
+            
+            if (isPronoteEncoded) {
+                html += '<p style="color: green;"><strong>✅ Fichier Pronote détecté - Conversion possible</strong></p>';
+                document.getElementById('conversionStep').style.display = 'block';
+            } else {
+                html += '<p style="color: orange;"><strong>⚠️ Fichier standard - Vérifiez le format</strong></p>';
+            }
+            
+            analysisDiv.innerHTML = html;
+            step.style.display = 'block';
+        }
+        
+        function convertFile() {
+            const resultDiv = document.getElementById('conversionResult');
+            resultDiv.innerHTML = '<p>🔄 Conversion en cours...</p>';
+            
+            try {
+                // Décoder le fichier Pronote
+                let decoded = originalContent
+                    .replace(/\+ADs-/g, ';')      // Point-virgule
+                    .replace(/\+AEA-/g, '@')      // Arobase  
+                    .replace(/\+AC0-/g, '-')      // Tiret
+                    .replace(/\+ACY-/g, '&')      // Esperluette
+                    .replace(/\+ACI-/g, '"')      // Guillemet
+                    .replace(/\+ACM-/g, '#')      // Dièse
+                    .replace(/\+ACQ-/g, '$')      // Dollar
+                    .replace(/\+ACU-/g, '%')      // Pourcentage
+                    .replace(/\+ACA-/g, ' ')      // Espace
+                    .replace(/\+/g, '');          // Supprimer les + restants
+                
+                // Diviser en lignes et champs
+                const lines = decoded.split('\n').filter(line => line.trim());
+                const teachers = [];
+                
+                for (const line of lines) {
+                    if (line.trim()) {
+                        const fields = line.split(';');
+                        
+                        // Extraire les informations de chaque enseignant
+                        // Format typique: LOGIN;CIVILITE;NOM;PRENOM;DATE;LIEU;FAMILLE;DISCIPLINE;EMAIL;...
+                        if (fields.length >= 8) {
+                            const teacher = {
+                                LOGIN: fields[0] || '',
+                                CIVILITE: fields[1] || '',
+                                NOM: fields[2] || '',
+                                PRENOM: fields[3] || '',
+                                EMAIL: fields[8] || '',
+                                DISCIPLINE: fields[7] || ''
+                            };
+                            
+                            // Nettoyer les données
+                            teacher.LOGIN = teacher.LOGIN.trim();
+                            teacher.NOM = teacher.NOM.trim().toUpperCase();
+                            teacher.PRENOM = teacher.PRENOM.trim();
+                            teacher.EMAIL = teacher.EMAIL.trim();
+                            
+                            if (teacher.NOM && teacher.PRENOM) {
+                                teachers.push(teacher);
+                            }
+                        }
+                    }
+                }
+                
+                // Créer le CSV final
+                const headers = ['LOGIN', 'NOM', 'PRENOM', 'EMAIL', 'DISCIPLINE'];
+                const csvLines = [headers.join(',')];
+                
+                for (const teacher of teachers) {
+                    const line = headers.map(h => `"${teacher[h] || ''}"`).join(',');
+                    csvLines.push(line);
+                }
+                
+                convertedContent = csvLines.join('\n');
+                
+                resultDiv.innerHTML = `
+                    <p style="color: green;"><strong>✅ Conversion réussie !</strong></p>
+                    <ul>
+                        <li>Enseignants extraits: ${teachers.length}</li>
+                        <li>Format: CSV standard avec guillemets</li>
+                        <li>Colonnes: LOGIN, NOM, PRENOM, EMAIL, DISCIPLINE</li>
+                    </ul>
+                `;
+                
+                // Afficher l'aperçu
+                const previewDiv = document.getElementById('previewResult');
+                const preview = convertedContent.split('\n').slice(0, 6).join('\n');
+                previewDiv.innerHTML = `
+                    <p><strong>Aperçu du fichier converti:</strong></p>
+                    <pre>${preview}</pre>
+                    <p><small>Aperçu des 5 premières lignes. Le fichier complet sera téléchargé.</small></p>
+                `;
+                
+                document.getElementById('downloadStep').style.display = 'block';
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color: red;"><strong>❌ Erreur de conversion:</strong> ${error.message}</p>`;
+            }
+        }
+        
+        function downloadConverted() {
+            if (!convertedContent) return;
+            
+            const blob = new Blob([convertedContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'enseignants-supchaissac.csv');
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            alert('✅ Fichier téléchargé ! Utilisez-le maintenant dans SupChaissac → Admin → Import PRONOTE');
+        }
+    </script>
+</body>
+</html>

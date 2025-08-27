@@ -1,0 +1,6 @@
+LOGIN,CIVILITE,NOM,PRENOM,EMAIL,DISCIPLINE,CLASSES,STATUT_PACTE
+claire.bernard,Mme,BERNARD,Claire,claire.bernard@college-chaissac.fr,MATHEMATIQUES,4B 3A 5C,OUI
+pierre.moreau,M.,MOREAU,Pierre,pierre.moreau@college-chaissac.fr,FRANCAIS,6A 5B 4C,NON
+anne.leroy,Mme,LEROY,Anne,anne.leroy@college-chaissac.fr,HISTOIRE-GEOGRAPHIE,3A 4A 5A,OUI
+marc.simon,M.,SIMON,Marc,marc.simon@college-chaissac.fr,SCIENCES PHYSIQUES,4A 3B 3C,NON
+sylvie.michel,Mme,MICHEL,Sylvie,sylvie.michel@college-chaissac.fr,SVT,6B 5A 4B,OUI
