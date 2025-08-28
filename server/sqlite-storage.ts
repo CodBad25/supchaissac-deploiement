@@ -327,6 +327,69 @@ export class SqliteStorage implements IStorage {
     }
   }
 
+  // 📎 MÉTHODES POUR LES DOCUMENTS JOINTS
+  async getAttachmentsBySession(sessionId: number): Promise<any[]> {
+    try {
+      // Pour l'instant, retourner un tableau vide car les attachments ne sont pas encore implémentés en SQLite
+      return [];
+    } catch (error) {
+      console.error('Error getting attachments by session:', error);
+      return [];
+    }
+  }
+
+  async getAttachmentById(id: number): Promise<any | undefined> {
+    try {
+      // Pour l'instant, retourner undefined car les attachments ne sont pas encore implémentés en SQLite
+      return undefined;
+    } catch (error) {
+      console.error('Error getting attachment by id:', error);
+      return undefined;
+    }
+  }
+
+  // 👥 MÉTHODES POUR LES UTILISATEURS ÉTENDUES
+  async getUsers(filter?: { role?: string }): Promise<User[]> {
+    try {
+      if (filter?.role) {
+        const result = await this.db.select().from(users).where(eq(users.role, filter.role));
+        return result;
+      } else {
+        const result = await this.db.select().from(users);
+        return result;
+      }
+    } catch (error) {
+      console.error('Error getting users:', error);
+      return [];
+    }
+  }
+
+  async getUserById(id: number): Promise<User | undefined> {
+    try {
+      const result = await this.db.select().from(users).where(eq(users.id, id));
+      return result[0];
+    } catch (error) {
+      console.error('Error getting user by id:', error);
+      return undefined;
+    }
+  }
+
+  // 📚 MÉTHODES POUR LES SESSIONS ÉTENDUES
+  async getSessions(filter?: { teacherId?: number }): Promise<Session[]> {
+    try {
+      if (filter?.teacherId) {
+        const result = await this.db.select().from(sessions).where(eq(sessions.teacherId, filter.teacherId));
+        return result;
+      } else {
+        const result = await this.db.select().from(sessions);
+        return result;
+      }
+    } catch (error) {
+      console.error('Error getting sessions:', error);
+      return [];
+    }
+  }
+
   // Utility method to close the connection
   async close(): Promise<void> {
     this.sqlite.close();

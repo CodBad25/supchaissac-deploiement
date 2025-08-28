@@ -21,7 +21,7 @@ try {
   
   // Copier shared/
   if (fs.existsSync('shared')) {
-    execSync('cp -r shared dist/', { stdio: 'inherit' });
+    fs.cpSync('shared', 'dist/shared', { recursive: true });
   }
   
   // Créer package.json pour production

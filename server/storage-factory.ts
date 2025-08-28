@@ -59,11 +59,15 @@ export async function createStorage(): Promise<IStorage> {
     return sqliteStorage;
   }
   
-  // Fallback vers MemStorage (non recommandé pour la production)
-  console.log('⚠️ Utilisation de MemStorage (données en mémoire)');
-  console.log('💡 Configurez DATABASE_URL pour utiliser une vraie base de données');
-  
-  return new MemStorage();
+  // Fallback vers SQLite au lieu de MemStorage
+  console.log('🗃️ Fallback vers SQLite avec données existantes...');
+  const sqliteStorage = new SqliteStorage('./data/supchaissac.db');
+
+  // Initialiser les données de test
+  await sqliteStorage.initializeTestData();
+
+  console.log('✅ SQLite initialisé avec succès');
+  return sqliteStorage;
 }
 
 export async function closeStorage(storage: IStorage): Promise<void> {
