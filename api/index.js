@@ -8,179 +8,217 @@ var __export = (target, all) => {
     __defProp(target, name, { get: all[name], enumerable: true });
 };
 
-// shared/schema-sqlite.ts
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
-import { createInsertSchema } from "drizzle-zod";
+// shared/schema-pg.ts
+import { pgTable, serial, text, timestamp, boolean, integer, pgEnum } from "drizzle-orm/pg-core";
+import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
-var users, sessions, teacherSetups, systemSettings, insertUserSchema, insertSessionSchema, insertTeacherSetupSchema, insertSystemSettingSchema, UserRole, TimeSlot, SessionType, SessionStatus;
-var init_schema_sqlite = __esm({
-  "shared/schema-sqlite.ts"() {
+var roleEnum, genderEnum, sessionStatusEnum, sessionTypeEnum, users, sessions, teacherSetups, systemSettings, attachments, pacteHistory, expressSessions, insertUserSchema, selectUserSchema, insertSessionSchema, selectSessionSchema, insertTeacherSetupSchema, selectTeacherSetupSchema, insertSystemSettingSchema, selectSystemSettingSchema, insertAttachmentSchema, updateAttachmentSchema, selectAttachmentSchema, loginSchema, createSessionSchema, updateSessionStatusSchema, rgpdRequestSchema, updateUserDataSchema;
+var init_schema_pg = __esm({
+  "shared/schema-pg.ts"() {
     "use strict";
-    users = sqliteTable("users", {
-      id: integer("id").primaryKey({ autoIncrement: true }),
+    roleEnum = pgEnum("role", ["TEACHER", "SECRETARY", "PRINCIPAL", "ADMIN"]);
+    genderEnum = pgEnum("gender", ["M", "F", "OTHER"]);
+    sessionStatusEnum = pgEnum("session_status", ["DRAFT", "PENDING_REVIEW", "PENDING_VALIDATION", "VALIDATED", "REJECTED"]);
+    sessionTypeEnum = pgEnum("session_type", ["REPLACEMENT", "EXTRA_HOURS", "MEETING", "TRAINING", "OTHER"]);
+    users = pgTable("users", {
+      id: serial("id").primaryKey(),
       username: text("username").notNull().unique(),
-      password: text("password").notNull(),
       name: text("name").notNull(),
-      role: text("role", { enum: ["TEACHER", "SECRETARY", "PRINCIPAL", "ADMIN"] }).notNull().default("TEACHER"),
-      initials: text("initials"),
+      role: roleEnum("role").notNull().default("TEACHER"),
+      gender: genderEnum("gender").default("OTHER"),
+      // Genre pour les couleurs des cartes
+      initials: text("initials").notNull(),
       signature: text("signature"),
-      inPacte: integer("in_pacte", { mode: "boolean" }).default(false)
+      // Base64 de la signature
+      inPacte: boolean("in_pacte").notNull().default(false),
+      password: text("password").notNull(),
+      createdAt: timestamp("created_at").defaultNow().notNull(),
+      updatedAt: timestamp("updated_at").defaultNow().notNull()
     });
-    sessions = sqliteTable("sessions", {
-      id: integer("id").primaryKey({ autoIncrement: true }),
-      date: text("date").notNull(),
-      // Date in YYYY-MM-DD format
-      timeSlot: text("time_slot", {
-        enum: ["M1", "M2", "M3", "M4", "S1", "S2", "S3", "S4"]
-      }).notNull(),
-      type: text("type", { enum: ["RCD", "DEVOIRS_FAITS", "HSE", "AUTRE"] }).notNull(),
-      teacherId: integer("teacher_id").notNull(),
+    sessions = pgTable("sessions", {
+      id: serial("id").primaryKey(),
+      teacherId: serial("teacher_id").references(() => users.id).notNull(),
       teacherName: text("teacher_name").notNull(),
-      inPacte: integer("in_pacte", { mode: "boolean" }).default(false),
-      status: text("status", {
-        enum: ["PENDING_REVIEW", "PENDING_VALIDATION", "VALIDATED", "REJECTED", "PAID"]
-      }).notNull().default("PENDING_REVIEW"),
-      createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => /* @__PURE__ */ new Date()),
-      updatedAt: integer("updated_at", { mode: "timestamp" }),
-      updatedBy: text("updated_by"),
-      // Session details
-      classes: text("classes"),
-      // JSON string of selected classes
-      subject: text("subject"),
+      date: text("date").notNull(),
+      // Format YYYY-MM-DD
+      timeSlot: text("time_slot").notNull(),
+      // Ex: "08:00-09:00"
+      type: sessionTypeEnum("type").notNull().default("REPLACEMENT"),
+      originalType: sessionTypeEnum("original_type").notNull(),
+      // Type initial (ne change jamais)
+      inPacte: boolean("in_pacte").default(false),
       description: text("description"),
-      // Validation workflow
-      reviewedBy: text("reviewed_by"),
-      reviewedAt: integer("reviewed_at", { mode: "timestamp" }),
-      reviewComments: text("review_comments"),
-      validatedBy: text("validated_by"),
-      validatedAt: integer("validated_at", { mode: "timestamp" }),
-      validationComments: text("validation_comments"),
-      rejectedBy: text("rejected_by"),
-      rejectedAt: integer("rejected_at", { mode: "timestamp" }),
+      status: sessionStatusEnum("status").notNull().default("DRAFT"),
+      replacedTeacherPrefix: text("replaced_teacher_prefix"),
+      replacedTeacherLastName: text("replaced_teacher_last_name"),
+      replacedTeacherFirstName: text("replaced_teacher_first_name"),
+      replacedTeacherName: text("replaced_teacher_name"),
+      className: text("class_name"),
+      subject: text("subject"),
+      comment: text("comment"),
+      studentCount: serial("student_count"),
+      gradeLevel: text("grade_level"),
+      reviewedBy: serial("reviewed_by").references(() => users.id),
+      reviewedAt: timestamp("reviewed_at"),
+      validatedBy: serial("validated_by").references(() => users.id),
+      validatedAt: timestamp("validated_at"),
       rejectionReason: text("rejection_reason"),
-      paidBy: text("paid_by"),
-      paidAt: integer("paid_at", { mode: "timestamp" }),
-      paymentReference: text("payment_reference")
+      createdAt: timestamp("created_at").defaultNow().notNull(),
+      updatedAt: timestamp("updated_at"),
+      updatedBy: text("updated_by")
     });
-    teacherSetups = sqliteTable("teacher_setups", {
-      id: integer("id").primaryKey({ autoIncrement: true }),
-      teacherId: integer("teacher_id").notNull().unique(),
-      preferredSubjects: text("preferred_subjects"),
-      // JSON array
-      availableTimeSlots: text("available_time_slots"),
-      // JSON array
-      maxHoursPerWeek: integer("max_hours_per_week").default(10),
-      notifications: integer("notifications", { mode: "boolean" }).default(true),
-      createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => /* @__PURE__ */ new Date()),
-      updatedAt: integer("updated_at", { mode: "timestamp" })
+    teacherSetups = pgTable("teacher_setups", {
+      id: serial("id").primaryKey(),
+      teacherId: integer("teacher_id").references(() => users.id).notNull().unique(),
+      inPacte: boolean("in_pacte").notNull().default(false),
+      signature: text("signature"),
+      // Base64 de la signature
+      createdAt: timestamp("created_at").defaultNow().notNull(),
+      updatedAt: timestamp("updated_at").defaultNow().notNull()
     });
-    systemSettings = sqliteTable("system_settings", {
-      id: integer("id").primaryKey({ autoIncrement: true }),
+    systemSettings = pgTable("system_settings", {
+      id: serial("id").primaryKey(),
       key: text("key").notNull().unique(),
       value: text("value").notNull(),
       description: text("description"),
-      updatedBy: text("updated_by").notNull(),
-      updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => /* @__PURE__ */ new Date())
+      createdAt: timestamp("created_at").defaultNow().notNull(),
+      updatedAt: timestamp("updated_at").defaultNow().notNull()
     });
-    insertUserSchema = createInsertSchema(users);
-    insertSessionSchema = createInsertSchema(sessions);
+    attachments = pgTable("attachments", {
+      id: serial("id").primaryKey(),
+      sessionId: integer("session_id").references(() => sessions.id, { onDelete: "cascade" }).notNull(),
+      fileName: text("file_name").notNull(),
+      originalName: text("original_name").notNull(),
+      mimeType: text("mime_type").notNull(),
+      fileSize: integer("file_size").notNull(),
+      filePath: text("file_path").notNull(),
+      uploadedBy: integer("uploaded_by").references(() => users.id).notNull(),
+      isVerified: boolean("is_verified").default(false),
+      verifiedBy: integer("verified_by").references(() => users.id),
+      verifiedAt: timestamp("verified_at"),
+      isArchived: boolean("is_archived").default(false),
+      archivedBy: integer("archived_by").references(() => users.id),
+      archivedAt: timestamp("archived_at"),
+      createdAt: timestamp("created_at").defaultNow().notNull()
+    });
+    pacteHistory = pgTable("pacte_history", {
+      id: serial("id").primaryKey(),
+      teacherId: integer("teacher_id").references(() => users.id).notNull(),
+      teacherName: text("teacher_name").notNull(),
+      previousStatus: boolean("previous_status").notNull(),
+      newStatus: boolean("new_status").notNull(),
+      reason: text("reason"),
+      // Raison du changement
+      schoolYear: text("school_year").notNull(),
+      // Ex: "2024-2025"
+      changedBy: integer("changed_by").references(() => users.id).notNull(),
+      changedByName: text("changed_by_name").notNull(),
+      createdAt: timestamp("created_at").defaultNow().notNull()
+    });
+    expressSessions = pgTable("session", {
+      sid: text("sid").primaryKey(),
+      sess: text("sess").notNull(),
+      // JSON stringifié
+      expire: timestamp("expire").notNull()
+    });
+    insertUserSchema = createInsertSchema(users, {
+      username: z.string().email("Email invalide"),
+      name: z.string().min(2, "Le nom doit contenir au moins 2 caract\xE8res"),
+      initials: z.string().min(1, "Les initiales sont requises").max(5, "Maximum 5 caract\xE8res"),
+      password: z.string().min(8, "Le mot de passe doit contenir au moins 8 caract\xE8res")
+    });
+    selectUserSchema = createSelectSchema(users);
+    insertSessionSchema = createInsertSchema(sessions, {
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format de date invalide (YYYY-MM-DD)"),
+      timeSlot: z.string().regex(/^\d{2}:\d{2}-\d{2}:\d{2}$/, "Format d'horaire invalide (HH:MM-HH:MM)"),
+      description: z.string().optional()
+    }).omit({
+      id: true,
+      originalType: true,
+      // Sera ajouté automatiquement côté serveur
+      createdAt: true,
+      updatedAt: true,
+      updatedBy: true
+    });
+    selectSessionSchema = createSelectSchema(sessions);
     insertTeacherSetupSchema = createInsertSchema(teacherSetups);
-    insertSystemSettingSchema = createInsertSchema(systemSettings);
-    UserRole = z.enum(["TEACHER", "SECRETARY", "PRINCIPAL", "ADMIN"]);
-    TimeSlot = z.enum(["M1", "M2", "M3", "M4", "S1", "S2", "S3", "S4"]);
-    SessionType = z.enum(["RCD", "DEVOIRS_FAITS", "HSE", "AUTRE"]);
-    SessionStatus = z.enum(["PENDING_REVIEW", "PENDING_VALIDATION", "VALIDATED", "REJECTED", "PAID"]);
+    selectTeacherSetupSchema = createSelectSchema(teacherSetups);
+    insertSystemSettingSchema = createInsertSchema(systemSettings, {
+      key: z.string().min(1, "La cl\xE9 est requise"),
+      value: z.string().min(1, "La valeur est requise")
+    });
+    selectSystemSettingSchema = createSelectSchema(systemSettings);
+    insertAttachmentSchema = createInsertSchema(attachments).omit({
+      id: true,
+      createdAt: true,
+      isVerified: true,
+      verifiedBy: true,
+      verifiedAt: true,
+      isArchived: true,
+      archivedBy: true,
+      archivedAt: true
+    });
+    updateAttachmentSchema = createInsertSchema(attachments).partial().omit({
+      id: true,
+      sessionId: true,
+      uploadedBy: true,
+      createdAt: true
+    });
+    selectAttachmentSchema = createSelectSchema(attachments);
+    loginSchema = z.object({
+      username: z.string().email("Email invalide"),
+      password: z.string().min(1, "Mot de passe requis")
+    });
+    createSessionSchema = z.object({
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format de date invalide"),
+      timeSlot: z.string().regex(/^\d{2}:\d{2}-\d{2}:\d{2}$/, "Format d'horaire invalide"),
+      type: z.enum(["REPLACEMENT", "EXTRA_HOURS", "MEETING", "TRAINING", "OTHER"]),
+      description: z.string().optional()
+    });
+    updateSessionStatusSchema = z.object({
+      status: z.enum(["DRAFT", "PENDING_REVIEW", "PENDING_VALIDATION", "VALIDATED", "REJECTED"]),
+      rejectionReason: z.string().optional()
+    });
+    rgpdRequestSchema = z.object({
+      type: z.enum(["ACCESS", "RECTIFICATION", "ERASURE", "PORTABILITY"]),
+      reason: z.string().optional()
+    });
+    updateUserDataSchema = z.object({
+      name: z.string().min(2).optional(),
+      initials: z.string().min(1).max(5).optional()
+    });
   }
 });
 
-// server/sqlite-storage.ts
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import Database from "better-sqlite3";
+// server/pg-storage.ts
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import { eq } from "drizzle-orm";
 import session from "express-session";
-import createMemoryStore from "memorystore";
-var MemoryStore, SqliteStorage;
-var init_sqlite_storage = __esm({
-  "server/sqlite-storage.ts"() {
+var PgStorage;
+var init_pg_storage = __esm({
+  "server/pg-storage.ts"() {
     "use strict";
-    init_schema_sqlite();
-    MemoryStore = createMemoryStore(session);
-    SqliteStorage = class {
+    init_schema_pg();
+    PgStorage = class {
       db;
-      sqlite;
+      sql;
       sessionStore;
-      constructor(dbPath = "./data/supchaissac.db") {
-        this.sqlite = new Database(dbPath);
-        this.sqlite.pragma("journal_mode = WAL");
-        this.db = drizzle(this.sqlite);
-        this.sessionStore = new MemoryStore({
-          checkPeriod: 864e5
-          // prune expired entries every 24h
-        });
-        this.initializeSchema();
+      constructor(databaseUrl) {
+        this.sql = postgres(databaseUrl);
+        this.db = drizzle(this.sql);
+        this.sessionStore = new session.MemoryStore();
       }
-      initializeSchema() {
-        this.sqlite.exec(`
-      CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT NOT NULL UNIQUE,
-        password TEXT NOT NULL,
-        name TEXT NOT NULL,
-        role TEXT NOT NULL DEFAULT 'TEACHER' CHECK (role IN ('TEACHER', 'SECRETARY', 'PRINCIPAL', 'ADMIN')),
-        initials TEXT,
-        signature TEXT,
-        in_pacte INTEGER DEFAULT 0
-      );
-
-      CREATE TABLE IF NOT EXISTS sessions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        date TEXT NOT NULL,
-        time_slot TEXT NOT NULL CHECK (time_slot IN ('M1', 'M2', 'M3', 'M4', 'S1', 'S2', 'S3', 'S4')),
-        type TEXT NOT NULL CHECK (type IN ('RCD', 'DEVOIRS_FAITS', 'HSE', 'AUTRE')),
-        teacher_id INTEGER NOT NULL,
-        teacher_name TEXT NOT NULL,
-        in_pacte INTEGER DEFAULT 0,
-        status TEXT NOT NULL DEFAULT 'PENDING_REVIEW' CHECK (status IN ('PENDING_REVIEW', 'PENDING_VALIDATION', 'VALIDATED', 'REJECTED', 'PAID')),
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER,
-        updated_by TEXT,
-        classes TEXT,
-        subject TEXT,
-        description TEXT,
-        reviewed_by TEXT,
-        reviewed_at INTEGER,
-        review_comments TEXT,
-        validated_by TEXT,
-        validated_at INTEGER,
-        validation_comments TEXT,
-        rejected_by TEXT,
-        rejected_at INTEGER,
-        rejection_reason TEXT,
-        paid_by TEXT,
-        paid_at INTEGER,
-        payment_reference TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS teacher_setups (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        teacher_id INTEGER NOT NULL UNIQUE,
-        preferred_subjects TEXT,
-        available_time_slots TEXT,
-        max_hours_per_week INTEGER DEFAULT 10,
-        notifications INTEGER DEFAULT 1,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER
-      );
-
-      CREATE TABLE IF NOT EXISTS system_settings (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        key TEXT NOT NULL UNIQUE,
-        value TEXT NOT NULL,
-        description TEXT,
-        updated_by TEXT NOT NULL,
-        updated_at INTEGER NOT NULL
-      );
-    `);
+      // 🔄 Initialisation des tables
+      async initialize() {
+        try {
+          console.log("\u{1F527} V\xE9rification des tables PostgreSQL...");
+          await this.sql`SELECT 1`;
+          console.log("\u2705 PostgreSQL initialis\xE9 avec succ\xE8s");
+        } catch (error) {
+          console.error("\u274C Erreur initialisation PostgreSQL:", error);
+          throw error;
+        }
       }
       // User methods
       async getUser(id) {
@@ -298,7 +336,7 @@ var init_sqlite_storage = __esm({
       async deleteSession(id) {
         try {
           const result = await this.db.delete(sessions).where(eq(sessions.id, id));
-          return result.changes > 0;
+          return result.rowCount > 0;
         } catch (error) {
           console.error("Error deleting session:", error);
           return false;
@@ -373,65 +411,9 @@ var init_sqlite_storage = __esm({
           return void 0;
         }
       }
-      // 📎 MÉTHODES POUR LES DOCUMENTS JOINTS
-      async getAttachmentsBySession(sessionId) {
-        try {
-          return [];
-        } catch (error) {
-          console.error("Error getting attachments by session:", error);
-          return [];
-        }
-      }
-      async getAttachmentById(id) {
-        try {
-          return void 0;
-        } catch (error) {
-          console.error("Error getting attachment by id:", error);
-          return void 0;
-        }
-      }
-      // 👥 MÉTHODES POUR LES UTILISATEURS ÉTENDUES
-      async getUsers(filter) {
-        try {
-          if (filter?.role) {
-            const result = await this.db.select().from(users).where(eq(users.role, filter.role));
-            return result;
-          } else {
-            const result = await this.db.select().from(users);
-            return result;
-          }
-        } catch (error) {
-          console.error("Error getting users:", error);
-          return [];
-        }
-      }
-      async getUserById(id) {
-        try {
-          const result = await this.db.select().from(users).where(eq(users.id, id));
-          return result[0];
-        } catch (error) {
-          console.error("Error getting user by id:", error);
-          return void 0;
-        }
-      }
-      // 📚 MÉTHODES POUR LES SESSIONS ÉTENDUES
-      async getSessions(filter) {
-        try {
-          if (filter?.teacherId) {
-            const result = await this.db.select().from(sessions).where(eq(sessions.teacherId, filter.teacherId));
-            return result;
-          } else {
-            const result = await this.db.select().from(sessions);
-            return result;
-          }
-        } catch (error) {
-          console.error("Error getting sessions:", error);
-          return [];
-        }
-      }
       // Utility method to close the connection
       async close() {
-        this.sqlite.close();
+        await this.sql.end();
       }
       // Method to initialize with test data (similar to MemStorage)
       async initializeTestData() {
@@ -499,487 +481,10 @@ var init_sqlite_storage = __esm({
           throw error;
         }
       }
-    };
-  }
-});
-
-// shared/schema-pg.ts
-import { pgTable, serial, text as text2, timestamp, boolean, integer as integer2, pgEnum } from "drizzle-orm/pg-core";
-import { createInsertSchema as createInsertSchema2, createSelectSchema } from "drizzle-zod";
-import { z as z2 } from "zod";
-var roleEnum, genderEnum, sessionStatusEnum, sessionTypeEnum, users2, sessions2, teacherSetups2, systemSettings2, attachments, pacteHistory, expressSessions, insertUserSchema2, selectUserSchema, insertSessionSchema2, selectSessionSchema, insertTeacherSetupSchema2, selectTeacherSetupSchema, insertSystemSettingSchema2, selectSystemSettingSchema, insertAttachmentSchema, updateAttachmentSchema, selectAttachmentSchema, loginSchema, createSessionSchema, updateSessionStatusSchema, rgpdRequestSchema, updateUserDataSchema;
-var init_schema_pg = __esm({
-  "shared/schema-pg.ts"() {
-    "use strict";
-    roleEnum = pgEnum("role", ["TEACHER", "SECRETARY", "PRINCIPAL", "ADMIN"]);
-    genderEnum = pgEnum("gender", ["M", "F", "OTHER"]);
-    sessionStatusEnum = pgEnum("session_status", ["DRAFT", "PENDING_REVIEW", "PENDING_VALIDATION", "VALIDATED", "REJECTED"]);
-    sessionTypeEnum = pgEnum("session_type", ["REPLACEMENT", "EXTRA_HOURS", "MEETING", "TRAINING", "OTHER"]);
-    users2 = pgTable("users", {
-      id: serial("id").primaryKey(),
-      username: text2("username").notNull().unique(),
-      name: text2("name").notNull(),
-      role: roleEnum("role").notNull().default("TEACHER"),
-      gender: genderEnum("gender").default("OTHER"),
-      // Genre pour les couleurs des cartes
-      initials: text2("initials").notNull(),
-      signature: text2("signature"),
-      // Base64 de la signature
-      inPacte: boolean("in_pacte").notNull().default(false),
-      password: text2("password").notNull(),
-      createdAt: timestamp("created_at").defaultNow().notNull(),
-      updatedAt: timestamp("updated_at").defaultNow().notNull()
-    });
-    sessions2 = pgTable("sessions", {
-      id: serial("id").primaryKey(),
-      teacherId: serial("teacher_id").references(() => users2.id).notNull(),
-      teacherName: text2("teacher_name").notNull(),
-      date: text2("date").notNull(),
-      // Format YYYY-MM-DD
-      timeSlot: text2("time_slot").notNull(),
-      // Ex: "08:00-09:00"
-      type: sessionTypeEnum("type").notNull().default("REPLACEMENT"),
-      originalType: sessionTypeEnum("original_type").notNull(),
-      // Type initial (ne change jamais)
-      inPacte: boolean("in_pacte").default(false),
-      description: text2("description"),
-      status: sessionStatusEnum("status").notNull().default("DRAFT"),
-      replacedTeacherPrefix: text2("replaced_teacher_prefix"),
-      replacedTeacherLastName: text2("replaced_teacher_last_name"),
-      replacedTeacherFirstName: text2("replaced_teacher_first_name"),
-      replacedTeacherName: text2("replaced_teacher_name"),
-      className: text2("class_name"),
-      subject: text2("subject"),
-      comment: text2("comment"),
-      studentCount: serial("student_count"),
-      gradeLevel: text2("grade_level"),
-      reviewedBy: serial("reviewed_by").references(() => users2.id),
-      reviewedAt: timestamp("reviewed_at"),
-      validatedBy: serial("validated_by").references(() => users2.id),
-      validatedAt: timestamp("validated_at"),
-      rejectionReason: text2("rejection_reason"),
-      createdAt: timestamp("created_at").defaultNow().notNull(),
-      updatedAt: timestamp("updated_at"),
-      updatedBy: text2("updated_by")
-    });
-    teacherSetups2 = pgTable("teacher_setups", {
-      id: serial("id").primaryKey(),
-      teacherId: integer2("teacher_id").references(() => users2.id).notNull().unique(),
-      inPacte: boolean("in_pacte").notNull().default(false),
-      signature: text2("signature"),
-      // Base64 de la signature
-      createdAt: timestamp("created_at").defaultNow().notNull(),
-      updatedAt: timestamp("updated_at").defaultNow().notNull()
-    });
-    systemSettings2 = pgTable("system_settings", {
-      id: serial("id").primaryKey(),
-      key: text2("key").notNull().unique(),
-      value: text2("value").notNull(),
-      description: text2("description"),
-      createdAt: timestamp("created_at").defaultNow().notNull(),
-      updatedAt: timestamp("updated_at").defaultNow().notNull()
-    });
-    attachments = pgTable("attachments", {
-      id: serial("id").primaryKey(),
-      sessionId: integer2("session_id").references(() => sessions2.id, { onDelete: "cascade" }).notNull(),
-      fileName: text2("file_name").notNull(),
-      originalName: text2("original_name").notNull(),
-      mimeType: text2("mime_type").notNull(),
-      fileSize: integer2("file_size").notNull(),
-      filePath: text2("file_path").notNull(),
-      uploadedBy: integer2("uploaded_by").references(() => users2.id).notNull(),
-      isVerified: boolean("is_verified").default(false),
-      verifiedBy: integer2("verified_by").references(() => users2.id),
-      verifiedAt: timestamp("verified_at"),
-      isArchived: boolean("is_archived").default(false),
-      archivedBy: integer2("archived_by").references(() => users2.id),
-      archivedAt: timestamp("archived_at"),
-      createdAt: timestamp("created_at").defaultNow().notNull()
-    });
-    pacteHistory = pgTable("pacte_history", {
-      id: serial("id").primaryKey(),
-      teacherId: integer2("teacher_id").references(() => users2.id).notNull(),
-      teacherName: text2("teacher_name").notNull(),
-      previousStatus: boolean("previous_status").notNull(),
-      newStatus: boolean("new_status").notNull(),
-      reason: text2("reason"),
-      // Raison du changement
-      schoolYear: text2("school_year").notNull(),
-      // Ex: "2024-2025"
-      changedBy: integer2("changed_by").references(() => users2.id).notNull(),
-      changedByName: text2("changed_by_name").notNull(),
-      createdAt: timestamp("created_at").defaultNow().notNull()
-    });
-    expressSessions = pgTable("session", {
-      sid: text2("sid").primaryKey(),
-      sess: text2("sess").notNull(),
-      // JSON stringifié
-      expire: timestamp("expire").notNull()
-    });
-    insertUserSchema2 = createInsertSchema2(users2, {
-      username: z2.string().email("Email invalide"),
-      name: z2.string().min(2, "Le nom doit contenir au moins 2 caract\xE8res"),
-      initials: z2.string().min(1, "Les initiales sont requises").max(5, "Maximum 5 caract\xE8res"),
-      password: z2.string().min(8, "Le mot de passe doit contenir au moins 8 caract\xE8res")
-    });
-    selectUserSchema = createSelectSchema(users2);
-    insertSessionSchema2 = createInsertSchema2(sessions2, {
-      date: z2.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format de date invalide (YYYY-MM-DD)"),
-      timeSlot: z2.string().regex(/^\d{2}:\d{2}-\d{2}:\d{2}$/, "Format d'horaire invalide (HH:MM-HH:MM)"),
-      description: z2.string().optional()
-    }).omit({
-      id: true,
-      originalType: true,
-      // Sera ajouté automatiquement côté serveur
-      createdAt: true,
-      updatedAt: true,
-      updatedBy: true
-    });
-    selectSessionSchema = createSelectSchema(sessions2);
-    insertTeacherSetupSchema2 = createInsertSchema2(teacherSetups2);
-    selectTeacherSetupSchema = createSelectSchema(teacherSetups2);
-    insertSystemSettingSchema2 = createInsertSchema2(systemSettings2, {
-      key: z2.string().min(1, "La cl\xE9 est requise"),
-      value: z2.string().min(1, "La valeur est requise")
-    });
-    selectSystemSettingSchema = createSelectSchema(systemSettings2);
-    insertAttachmentSchema = createInsertSchema2(attachments).omit({
-      id: true,
-      createdAt: true,
-      isVerified: true,
-      verifiedBy: true,
-      verifiedAt: true,
-      isArchived: true,
-      archivedBy: true,
-      archivedAt: true
-    });
-    updateAttachmentSchema = createInsertSchema2(attachments).partial().omit({
-      id: true,
-      sessionId: true,
-      uploadedBy: true,
-      createdAt: true
-    });
-    selectAttachmentSchema = createSelectSchema(attachments);
-    loginSchema = z2.object({
-      username: z2.string().email("Email invalide"),
-      password: z2.string().min(1, "Mot de passe requis")
-    });
-    createSessionSchema = z2.object({
-      date: z2.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format de date invalide"),
-      timeSlot: z2.string().regex(/^\d{2}:\d{2}-\d{2}:\d{2}$/, "Format d'horaire invalide"),
-      type: z2.enum(["REPLACEMENT", "EXTRA_HOURS", "MEETING", "TRAINING", "OTHER"]),
-      description: z2.string().optional()
-    });
-    updateSessionStatusSchema = z2.object({
-      status: z2.enum(["DRAFT", "PENDING_REVIEW", "PENDING_VALIDATION", "VALIDATED", "REJECTED"]),
-      rejectionReason: z2.string().optional()
-    });
-    rgpdRequestSchema = z2.object({
-      type: z2.enum(["ACCESS", "RECTIFICATION", "ERASURE", "PORTABILITY"]),
-      reason: z2.string().optional()
-    });
-    updateUserDataSchema = z2.object({
-      name: z2.string().min(2).optional(),
-      initials: z2.string().min(1).max(5).optional()
-    });
-  }
-});
-
-// server/pg-storage.ts
-import { drizzle as drizzle2 } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
-import { eq as eq2 } from "drizzle-orm";
-import session2 from "express-session";
-var PgStorage;
-var init_pg_storage = __esm({
-  "server/pg-storage.ts"() {
-    "use strict";
-    init_schema_pg();
-    PgStorage = class {
-      db;
-      sql;
-      sessionStore;
-      constructor(databaseUrl) {
-        this.sql = postgres(databaseUrl);
-        this.db = drizzle2(this.sql);
-        this.sessionStore = new session2.MemoryStore();
-      }
-      // 🔄 Initialisation des tables
-      async initialize() {
-        try {
-          console.log("\u{1F527} V\xE9rification des tables PostgreSQL...");
-          await this.sql`SELECT 1`;
-          console.log("\u2705 PostgreSQL initialis\xE9 avec succ\xE8s");
-        } catch (error) {
-          console.error("\u274C Erreur initialisation PostgreSQL:", error);
-          throw error;
-        }
-      }
-      // User methods
-      async getUser(id) {
-        try {
-          const result = await this.db.select().from(users2).where(eq2(users2.id, id)).limit(1);
-          return result[0];
-        } catch (error) {
-          console.error("Error getting user:", error);
-          return void 0;
-        }
-      }
-      async getUserByUsername(username) {
-        try {
-          const result = await this.db.select().from(users2).where(eq2(users2.username, username.toLowerCase())).limit(1);
-          return result[0];
-        } catch (error) {
-          console.error("Error getting user by username:", error);
-          return void 0;
-        }
-      }
-      async createUser(userData) {
-        try {
-          const initials = userData.name.split(" ").map((part) => part.charAt(0)).join("").toUpperCase();
-          const userToInsert = {
-            ...userData,
-            username: userData.username.toLowerCase(),
-            initials
-          };
-          const result = await this.db.insert(users2).values(userToInsert).returning();
-          return result[0];
-        } catch (error) {
-          console.error("Error creating user:", error);
-          throw error;
-        }
-      }
-      async updateUser(id, data) {
-        try {
-          const result = await this.db.update(users2).set(data).where(eq2(users2.id, id)).returning();
-          return result[0];
-        } catch (error) {
-          console.error("Error updating user:", error);
-          return void 0;
-        }
-      }
-      async getUserById(id) {
-        return this.getUser(id);
-      }
-      async getUsers() {
-        try {
-          const result = await this.db.select().from(users2);
-          return result;
-        } catch (error) {
-          console.error("Error getting users:", error);
-          return [];
-        }
-      }
-      async deleteUser(id) {
-        try {
-          await this.db.delete(teacherSetups2).where(eq2(teacherSetups2.userId, id));
-          const result = await this.db.delete(users2).where(eq2(users2.id, id));
-          return true;
-        } catch (error) {
-          console.error("Error deleting user:", error);
-          return false;
-        }
-      }
-      // Session methods
-      async getSessions() {
-        try {
-          return await this.db.select().from(sessions2);
-        } catch (error) {
-          console.error("Error getting sessions:", error);
-          return [];
-        }
-      }
-      async getSessionsByTeacher(teacherId) {
-        try {
-          return await this.db.select().from(sessions2).where(eq2(sessions2.teacherId, teacherId));
-        } catch (error) {
-          console.error("Error getting sessions by teacher:", error);
-          return [];
-        }
-      }
-      async getSessionById(id) {
-        try {
-          const result = await this.db.select().from(sessions2).where(eq2(sessions2.id, id)).limit(1);
-          return result[0];
-        } catch (error) {
-          console.error("Error getting session by id:", error);
-          return void 0;
-        }
-      }
-      async createSession(sessionData) {
-        try {
-          const result = await this.db.insert(sessions2).values(sessionData).returning();
-          return result[0];
-        } catch (error) {
-          console.error("Error creating session:", error);
-          throw error;
-        }
-      }
-      async updateSession(id, data) {
-        try {
-          const updateData = {
-            ...data,
-            updatedAt: /* @__PURE__ */ new Date()
-          };
-          const result = await this.db.update(sessions2).set(updateData).where(eq2(sessions2.id, id)).returning();
-          return result[0];
-        } catch (error) {
-          console.error("Error updating session:", error);
-          return void 0;
-        }
-      }
-      async deleteSession(id) {
-        try {
-          const result = await this.db.delete(sessions2).where(eq2(sessions2.id, id));
-          return result.rowCount > 0;
-        } catch (error) {
-          console.error("Error deleting session:", error);
-          return false;
-        }
-      }
-      // Teacher setup methods
-      async getTeacherSetup(teacherId) {
-        try {
-          const result = await this.db.select().from(teacherSetups2).where(eq2(teacherSetups2.teacherId, teacherId)).limit(1);
-          return result[0];
-        } catch (error) {
-          console.error("Error getting teacher setup:", error);
-          return void 0;
-        }
-      }
-      async createTeacherSetup(setupData) {
-        try {
-          const result = await this.db.insert(teacherSetups2).values(setupData).returning();
-          return result[0];
-        } catch (error) {
-          console.error("Error creating teacher setup:", error);
-          throw error;
-        }
-      }
-      async updateTeacherSetup(teacherId, data) {
-        try {
-          const result = await this.db.update(teacherSetups2).set(data).where(eq2(teacherSetups2.teacherId, teacherId)).returning();
-          return result[0];
-        } catch (error) {
-          console.error("Error updating teacher setup:", error);
-          return void 0;
-        }
-      }
-      // System settings methods
-      async getSystemSettings() {
-        try {
-          return await this.db.select().from(systemSettings2);
-        } catch (error) {
-          console.error("Error getting system settings:", error);
-          return [];
-        }
-      }
-      async getSystemSettingByKey(key) {
-        try {
-          const result = await this.db.select().from(systemSettings2).where(eq2(systemSettings2.key, key)).limit(1);
-          return result[0];
-        } catch (error) {
-          console.error("Error getting system setting by key:", error);
-          return void 0;
-        }
-      }
-      async createSystemSetting(settingData) {
-        try {
-          const result = await this.db.insert(systemSettings2).values(settingData).returning();
-          return result[0];
-        } catch (error) {
-          console.error("Error creating system setting:", error);
-          throw error;
-        }
-      }
-      async updateSystemSetting(key, value, updatedBy) {
-        try {
-          const updateData = {
-            value,
-            updatedBy,
-            updatedAt: /* @__PURE__ */ new Date()
-          };
-          const result = await this.db.update(systemSettings2).set(updateData).where(eq2(systemSettings2.key, key)).returning();
-          return result[0];
-        } catch (error) {
-          console.error("Error updating system setting:", error);
-          return void 0;
-        }
-      }
-      // Utility method to close the connection
-      async close() {
-        await this.sql.end();
-      }
-      // Method to initialize with test data (similar to MemStorage)
-      async initializeTestData() {
-        try {
-          const existingUsers = await this.db.select().from(users2).limit(1);
-          if (existingUsers.length > 0) {
-            console.log("Test data already exists, skipping initialization");
-            return;
-          }
-          console.log("Initializing test data...");
-          const testUsers = [
-            {
-              username: "teacher1@example.com",
-              password: "password123",
-              name: "Sophie MARTIN",
-              role: "TEACHER",
-              inPacte: false
-            },
-            {
-              username: "teacher2@example.com",
-              password: "password123",
-              name: "Marie PETIT",
-              role: "TEACHER",
-              inPacte: true
-            },
-            {
-              username: "teacher3@example.com",
-              password: "password123",
-              name: "Martin DUBOIS",
-              role: "TEACHER",
-              inPacte: false
-            },
-            {
-              username: "teacher4@example.com",
-              password: "password123",
-              name: "Philippe GARCIA",
-              role: "TEACHER",
-              inPacte: true
-            },
-            {
-              username: "secretary@example.com",
-              password: "password123",
-              name: "Laure MARTIN",
-              role: "SECRETARY"
-            },
-            {
-              username: "principal@example.com",
-              password: "password123",
-              name: "Jean DUPONT",
-              role: "PRINCIPAL"
-            },
-            {
-              username: "admin@example.com",
-              password: "password123",
-              name: "Admin",
-              role: "ADMIN"
-            }
-          ];
-          for (const userData of testUsers) {
-            await this.createUser(userData);
-          }
-          console.log("Test data initialized successfully");
-        } catch (error) {
-          console.error("Error initializing test data:", error);
-          throw error;
-        }
-      }
       // 📎 MÉTHODES POUR LES DOCUMENTS JOINTS
       async getAttachmentsBySession(sessionId) {
         try {
-          const result = await this.db.select().from(attachments).where(eq2(attachments.sessionId, sessionId));
+          const result = await this.db.select().from(attachments).where(eq(attachments.sessionId, sessionId));
           return result;
         } catch (error) {
           console.error("Error getting attachments by session:", error);
@@ -988,7 +493,7 @@ var init_pg_storage = __esm({
       }
       async getAttachmentById(id) {
         try {
-          const result = await this.db.select().from(attachments).where(eq2(attachments.id, id)).limit(1);
+          const result = await this.db.select().from(attachments).where(eq(attachments.id, id)).limit(1);
           return result[0];
         } catch (error) {
           console.error("Error getting attachment by id:", error);
@@ -1006,7 +511,7 @@ var init_pg_storage = __esm({
       }
       async updateAttachment(id, data) {
         try {
-          const result = await this.db.update(attachments).set(data).where(eq2(attachments.id, id)).returning();
+          const result = await this.db.update(attachments).set(data).where(eq(attachments.id, id)).returning();
           return result[0];
         } catch (error) {
           console.error("Error updating attachment:", error);
@@ -1015,7 +520,7 @@ var init_pg_storage = __esm({
       }
       async deleteAttachment(id) {
         try {
-          const result = await this.db.delete(attachments).where(eq2(attachments.id, id)).returning();
+          const result = await this.db.delete(attachments).where(eq(attachments.id, id)).returning();
           return result.length > 0;
         } catch (error) {
           console.error("Error deleting attachment:", error);
@@ -1028,7 +533,7 @@ var init_pg_storage = __esm({
             isVerified: true,
             verifiedBy,
             verifiedAt: /* @__PURE__ */ new Date()
-          }).where(eq2(attachments.id, id)).returning();
+          }).where(eq(attachments.id, id)).returning();
           return result[0];
         } catch (error) {
           console.error("Error verifying attachment:", error);
@@ -1041,7 +546,7 @@ var init_pg_storage = __esm({
             isArchived: true,
             archivedBy,
             archivedAt: /* @__PURE__ */ new Date()
-          }).where(eq2(attachments.id, id)).returning();
+          }).where(eq(attachments.id, id)).returning();
           return result[0];
         } catch (error) {
           console.error("Error archiving attachment:", error);
@@ -1056,46 +561,23 @@ var init_pg_storage = __esm({
 import dotenv from "dotenv";
 async function createStorage() {
   const databaseUrl = process.env.DATABASE_URL;
-  const nodeEnv = process.env.NODE_ENV || "development";
   console.log("\u{1F527} Configuration du syst\xE8me de stockage...");
-  console.log(`\u{1F4CA} Environnement: ${nodeEnv}`);
-  if (databaseUrl && databaseUrl.startsWith("postgresql://")) {
-    console.log("\u{1F418} Tentative de connexion PostgreSQL...");
-    try {
-      const pgStorage = new PgStorage(databaseUrl);
-      await pgStorage.initialize();
-      console.log("\u2705 PostgreSQL connect\xE9 avec succ\xE8s");
-      return pgStorage;
-    } catch (error) {
-      console.log("\u274C Erreur PostgreSQL:", error.message);
-      console.log("\u{1F504} Basculement vers SQLite...");
-    }
+  console.log("\u{1F418} NEON PostgreSQL UNIQUEMENT");
+  if (!databaseUrl) {
+    throw new Error("\u274C DATABASE_URL manquante ! Configurez Neon PostgreSQL.");
   }
-  if (databaseUrl && (databaseUrl.startsWith("file://") || databaseUrl.startsWith("sqlite://"))) {
-    console.log("\u{1F5C3}\uFE0F Utilisation de SQLite...");
-    const dbPath = databaseUrl.replace(/^(file|sqlite):\/\//, "");
-    const sqliteStorage2 = new SqliteStorage(dbPath);
-    await sqliteStorage2.initializeTestData();
-    console.log("\u2705 SQLite initialis\xE9 avec succ\xE8s");
-    return sqliteStorage2;
+  if (!databaseUrl.startsWith("postgresql://")) {
+    throw new Error("\u274C DATABASE_URL doit \xEAtre PostgreSQL (postgresql://...)");
   }
-  if (nodeEnv === "development") {
-    console.log("\u{1F5C3}\uFE0F Utilisation de SQLite pour le d\xE9veloppement...");
-    const sqliteStorage2 = new SqliteStorage("./data/supchaissac.db");
-    await sqliteStorage2.initializeTestData();
-    console.log("\u2705 SQLite initialis\xE9 avec succ\xE8s");
-    return sqliteStorage2;
-  }
-  console.log("\u{1F5C3}\uFE0F Fallback vers SQLite avec donn\xE9es existantes...");
-  const sqliteStorage = new SqliteStorage("./data/supchaissac.db");
-  await sqliteStorage.initializeTestData();
-  console.log("\u2705 SQLite initialis\xE9 avec succ\xE8s");
-  return sqliteStorage;
+  console.log("\u{1F418} Connexion \xE0 Neon PostgreSQL...");
+  const pgStorage = new PgStorage(databaseUrl);
+  await pgStorage.initialize();
+  console.log("\u2705 Neon PostgreSQL connect\xE9 avec succ\xE8s");
+  return pgStorage;
 }
 var init_storage_factory = __esm({
   "server/storage-factory.ts"() {
     "use strict";
-    init_sqlite_storage();
     init_pg_storage();
     dotenv.config();
   }
@@ -1156,7 +638,7 @@ var init_rgpd_compliance = __esm({
           if (!user) {
             throw new Error("Utilisateur non trouv\xE9");
           }
-          const sessions4 = await storage.getSessionsByTeacher(userId);
+          const sessions3 = await storage.getSessionsByTeacher(userId);
           const teacherSetup = await storage.getTeacherSetup(userId);
           const userData = {
             exportDate: (/* @__PURE__ */ new Date()).toISOString(),
@@ -1169,14 +651,14 @@ var init_rgpd_compliance = __esm({
               inPacte: user.inPacte
               // Mot de passe exclu pour sécurité
             },
-            sessions: sessions4.map((session4) => ({
-              id: session4.id,
-              date: session4.date,
-              timeSlot: session4.timeSlot,
-              type: session4.type,
-              status: session4.status,
-              createdAt: session4.createdAt,
-              updatedAt: session4.updatedAt
+            sessions: sessions3.map((session3) => ({
+              id: session3.id,
+              date: session3.date,
+              timeSlot: session3.timeSlot,
+              type: session3.type,
+              status: session3.status,
+              createdAt: session3.createdAt,
+              updatedAt: session3.updatedAt
             })),
             teacherSetup: teacherSetup ? {
               inPacte: teacherSetup.inPacte,
@@ -1213,9 +695,9 @@ var init_rgpd_compliance = __esm({
           if (!canDelete.allowed) {
             throw new Error(`Effacement impossible: ${canDelete.reason}`);
           }
-          const sessions4 = await storage.getSessionsByTeacher(userId);
-          for (const session4 of sessions4) {
-            await storage.deleteSession(session4.id);
+          const sessions3 = await storage.getSessionsByTeacher(userId);
+          for (const session3 of sessions3) {
+            await storage.deleteSession(session3.id);
           }
           const teacherSetup = await storage.getTeacherSetup(userId);
           if (teacherSetup) {
@@ -1233,8 +715,8 @@ var init_rgpd_compliance = __esm({
       async canDeleteUserData(userId) {
         const storage = getStorage();
         try {
-          const sessions4 = await storage.getSessionsByTeacher(userId);
-          const pendingSessions = sessions4.filter(
+          const sessions3 = await storage.getSessionsByTeacher(userId);
+          const pendingSessions = sessions3.filter(
             (s) => s.status === "PENDING_REVIEW" || s.status === "PENDING_VALIDATION" || s.status === "VALIDATED"
           );
           if (pendingSessions.length > 0) {
@@ -1244,8 +726,8 @@ var init_rgpd_compliance = __esm({
             };
           }
           const retentionYears = parseInt(process.env.DATA_RETENTION_YEARS || "5");
-          const oldestSession = sessions4.reduce((oldest, session4) => {
-            const sessionDate = new Date(session4.createdAt);
+          const oldestSession = sessions3.reduce((oldest, session3) => {
+            const sessionDate = new Date(session3.createdAt);
             return sessionDate < oldest ? sessionDate : oldest;
           }, /* @__PURE__ */ new Date());
           const retentionEndDate = new Date(oldestSession);
@@ -1292,7 +774,7 @@ var init_rgpd_compliance = __esm({
       async generateComplianceReport() {
         const storage = getStorage();
         try {
-          const users4 = await storage.getUsers();
+          const users3 = await storage.getUsers();
           const allSessions = await storage.getSessions();
           const report = {
             generatedAt: (/* @__PURE__ */ new Date()).toISOString(),
@@ -1301,14 +783,14 @@ var init_rgpd_compliance = __esm({
               dpo: process.env.DPO_NAME || "DPO non d\xE9sign\xE9"
             },
             statistics: {
-              totalUsers: users4.length,
+              totalUsers: users3.length,
               totalSessions: allSessions.length,
-              usersByRole: users4.reduce((acc, user) => {
+              usersByRole: users3.reduce((acc, user) => {
                 acc[user.role] = (acc[user.role] || 0) + 1;
                 return acc;
               }, {}),
-              sessionsByStatus: allSessions.reduce((acc, session4) => {
-                acc[session4.status] = (acc[session4.status] || 0) + 1;
+              sessionsByStatus: allSessions.reduce((acc, session3) => {
+                acc[session3.status] = (acc[session3.status] || 0) + 1;
                 return acc;
               }, {})
             },
@@ -1345,7 +827,7 @@ import { createServer } from "http";
 init_storage_instance();
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
-import session3 from "express-session";
+import session2 from "express-session";
 import { scrypt, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import bcrypt from "bcrypt";
@@ -1396,7 +878,7 @@ function setupAuth(app2) {
     }
   };
   app2.set("trust proxy", 1);
-  app2.use(session3(sessionSettings));
+  app2.use(session2(sessionSettings));
   app2.use(passport.initialize());
   app2.use(passport.session());
   passport.use(
@@ -1580,20 +1062,20 @@ function setupAuth(app2) {
 }
 
 // server/routes.ts
-import { z as z3 } from "zod";
+import { z as z2 } from "zod";
 
 // shared/schema.ts
-import { pgTable as pgTable2, text as text3, serial as serial2, integer as integer3, boolean as boolean2, timestamp as timestamp2, pgEnum as pgEnum2 } from "drizzle-orm/pg-core";
-import { createInsertSchema as createInsertSchema3 } from "drizzle-zod";
+import { pgTable as pgTable2, text as text2, serial as serial2, integer as integer2, boolean as boolean2, timestamp as timestamp2, pgEnum as pgEnum2 } from "drizzle-orm/pg-core";
+import { createInsertSchema as createInsertSchema2 } from "drizzle-zod";
 var userRoleEnum = pgEnum2("user_role", ["TEACHER", "SECRETARY", "PRINCIPAL", "ADMIN"]);
-var users3 = pgTable2("users", {
+var users2 = pgTable2("users", {
   id: serial2("id").primaryKey(),
-  username: text3("username").notNull().unique(),
-  password: text3("password").notNull(),
-  name: text3("name").notNull(),
+  username: text2("username").notNull().unique(),
+  password: text2("password").notNull(),
+  name: text2("name").notNull(),
   role: userRoleEnum("role").notNull().default("TEACHER"),
-  initials: text3("initials"),
-  signature: text3("signature"),
+  initials: text2("initials"),
+  signature: text2("signature"),
   inPacte: boolean2("in_pacte").default(false)
 });
 var timeSlotEnum = pgEnum2("time_slot", [
@@ -1625,65 +1107,65 @@ var sessionStatusEnum2 = pgEnum2("session_status", [
   "PAID"
   // Marked as paid by secretary
 ]);
-var sessions3 = pgTable2("sessions", {
+var sessions2 = pgTable2("sessions", {
   id: serial2("id").primaryKey(),
-  date: text3("date").notNull(),
+  date: text2("date").notNull(),
   // Date in YYYY-MM-DD format
   timeSlot: timeSlotEnum("time_slot").notNull(),
   type: sessionTypeEnum2("type").notNull(),
-  teacherId: integer3("teacher_id").notNull(),
-  teacherName: text3("teacher_name").notNull(),
+  teacherId: integer2("teacher_id").notNull(),
+  teacherName: text2("teacher_name").notNull(),
   inPacte: boolean2("in_pacte").default(false),
   status: sessionStatusEnum2("status").notNull().default("PENDING_REVIEW"),
   createdAt: timestamp2("created_at").notNull().defaultNow(),
   updatedAt: timestamp2("updated_at"),
-  updatedBy: text3("updated_by"),
+  updatedBy: text2("updated_by"),
   // Fields specific to RCD
-  replacedTeacherPrefix: text3("replaced_teacher_prefix"),
+  replacedTeacherPrefix: text2("replaced_teacher_prefix"),
   // M. or Mme
-  replacedTeacherLastName: text3("replaced_teacher_last_name"),
-  replacedTeacherFirstName: text3("replaced_teacher_first_name"),
-  replacedTeacherName: text3("replaced_teacher_name"),
-  className: text3("class_name"),
-  subject: text3("subject"),
-  comment: text3("comment"),
+  replacedTeacherLastName: text2("replaced_teacher_last_name"),
+  replacedTeacherFirstName: text2("replaced_teacher_first_name"),
+  replacedTeacherName: text2("replaced_teacher_name"),
+  className: text2("class_name"),
+  subject: text2("subject"),
+  comment: text2("comment"),
   // Fields specific to Devoirs Faits
-  studentCount: integer3("student_count"),
-  gradeLevel: text3("grade_level"),
+  studentCount: integer2("student_count"),
+  gradeLevel: text2("grade_level"),
   // Fields specific to Autre
-  description: text3("description")
+  description: text2("description")
 });
-var teacherSetups3 = pgTable2("teacher_setups", {
+var teacherSetups2 = pgTable2("teacher_setups", {
   id: serial2("id").primaryKey(),
-  teacherId: integer3("teacher_id").notNull().unique(),
+  teacherId: integer2("teacher_id").notNull().unique(),
   inPacte: boolean2("in_pacte").default(false),
-  signature: text3("signature")
+  signature: text2("signature")
 });
-var systemSettings3 = pgTable2("system_settings", {
+var systemSettings2 = pgTable2("system_settings", {
   id: serial2("id").primaryKey(),
-  key: text3("key").notNull().unique(),
-  value: text3("value").notNull(),
-  description: text3("description"),
+  key: text2("key").notNull().unique(),
+  value: text2("value").notNull(),
+  description: text2("description"),
   updatedAt: timestamp2("updated_at").defaultNow(),
-  updatedBy: text3("updated_by")
+  updatedBy: text2("updated_by")
 });
-var insertUserSchema3 = createInsertSchema3(users3).pick({
+var insertUserSchema2 = createInsertSchema2(users2).pick({
   username: true,
   password: true,
   name: true,
   role: true,
   inPacte: true
 });
-var insertSessionSchema3 = createInsertSchema3(sessions3).omit({
+var insertSessionSchema2 = createInsertSchema2(sessions2).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
   updatedBy: true
 });
-var insertTeacherSetupSchema3 = createInsertSchema3(teacherSetups3).omit({
+var insertTeacherSetupSchema2 = createInsertSchema2(teacherSetups2).omit({
   id: true
 });
-var insertSystemSettingSchema3 = createInsertSchema3(systemSettings3).omit({
+var insertSystemSettingSchema2 = createInsertSchema2(systemSettings2).omit({
   id: true,
   updatedAt: true
 });
@@ -1710,17 +1192,17 @@ async function registerRoutes(app2) {
     const userRole = req.user.role;
     console.log(`\u{1F4CA} [API] GET /api/sessions - User: ${req.user.name} (${userRole})`);
     try {
-      let sessions4;
+      let sessions3;
       if (userRole === "TEACHER") {
         console.log(`\u{1F393} [API] R\xE9cup\xE9ration des sessions pour l'enseignant ID: ${userId}`);
-        sessions4 = await storage.getSessionsByTeacher(userId);
+        sessions3 = await storage.getSessionsByTeacher(userId);
       } else {
         console.log(`\u{1F465} [API] R\xE9cup\xE9ration de toutes les sessions (r\xF4le: ${userRole})`);
-        sessions4 = await storage.getSessions();
+        sessions3 = await storage.getSessions();
       }
       const duration = Date.now() - startTime;
-      console.log(`\u2705 [API] Sessions r\xE9cup\xE9r\xE9es: ${sessions4.length} sessions (${duration}ms)`);
-      res.json(sessions4);
+      console.log(`\u2705 [API] Sessions r\xE9cup\xE9r\xE9es: ${sessions3.length} sessions (${duration}ms)`);
+      res.json(sessions3);
     } catch (error) {
       const duration = Date.now() - startTime;
       console.error(`\u{1F6A8} [API] Erreur r\xE9cup\xE9ration sessions pour ${req.user.name} (${duration}ms):`, error);
@@ -1737,38 +1219,38 @@ async function registerRoutes(app2) {
       if (req.user.role === "TEACHER" && req.user.id !== teacherId) {
         return res.status(403).json({ error: "Un enseignant ne peut consulter que ses propres sessions" });
       }
-      const sessions4 = await storage.getSessionsByTeacher(teacherId);
-      res.json(sessions4);
+      const sessions3 = await storage.getSessionsByTeacher(teacherId);
+      res.json(sessions3);
     } catch (error) {
       res.status(500).json({ error: "Impossible de r\xE9cup\xE9rer les sessions de cet enseignant" });
     }
   });
   app2.get("/api/sessions/:id", isAuthenticated, async (req, res) => {
     try {
-      const session4 = await storage.getSessionById(parseInt(req.params.id));
-      if (!session4) {
+      const session3 = await storage.getSessionById(parseInt(req.params.id));
+      if (!session3) {
         return res.status(404).json({ error: "Session not found" });
       }
-      if (req.user.role === "TEACHER" && session4.teacherId !== req.user.id) {
+      if (req.user.role === "TEACHER" && session3.teacherId !== req.user.id) {
         return res.status(403).json({ error: "Access denied" });
       }
-      res.json(session4);
+      res.json(session3);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch session" });
     }
   });
   app2.get("/api/sessions/:id/edit-status", isAuthenticated, async (req, res) => {
     try {
-      const session4 = await storage.getSessionById(parseInt(req.params.id));
-      if (!session4) {
+      const session3 = await storage.getSessionById(parseInt(req.params.id));
+      if (!session3) {
         return res.status(404).json({ error: "Session non trouv\xE9e" });
       }
-      if (req.user.role === "TEACHER" && session4.teacherId !== req.user.id) {
+      if (req.user.role === "TEACHER" && session3.teacherId !== req.user.id) {
         return res.status(403).json({ error: "Acc\xE8s refus\xE9" });
       }
-      if (req.user.role !== "TEACHER" || session4.status !== "PENDING_REVIEW") {
+      if (req.user.role !== "TEACHER" || session3.status !== "PENDING_REVIEW") {
         return res.json({
-          isEditable: req.user.role !== "TEACHER" || session4.status === "PENDING_REVIEW",
+          isEditable: req.user.role !== "TEACHER" || session3.status === "PENDING_REVIEW",
           editWindow: null,
           elapsed: null,
           remaining: null
@@ -1776,7 +1258,7 @@ async function registerRoutes(app2) {
       }
       const editWindowSetting = await storage.getSystemSettingByKey("SESSION_EDIT_WINDOW");
       const editWindowMinutes = editWindowSetting ? parseInt(editWindowSetting.value) : 60;
-      const creationTime = new Date(session4.createdAt).getTime();
+      const creationTime = new Date(session3.createdAt).getTime();
       const currentTime = (/* @__PURE__ */ new Date()).getTime();
       const diffMinutes = Math.floor((currentTime - creationTime) / (1e3 * 60));
       const remainingMinutes = Math.max(0, editWindowMinutes - diffMinutes);
@@ -1793,7 +1275,7 @@ async function registerRoutes(app2) {
   app2.post("/api/sessions", isAuthenticated, async (req, res) => {
     try {
       console.log("\u{1F4DD} Donn\xE9es re\xE7ues:", req.body);
-      const validatedData = insertSessionSchema3.parse(req.body);
+      const validatedData = insertSessionSchema2.parse(req.body);
       console.log("\u2705 Donn\xE9es valid\xE9es:", validatedData);
       if (req.user.role === "TEACHER" && validatedData.teacherId !== req.user.id) {
         return res.status(403).json({ error: "Cannot create sessions for other teachers" });
@@ -1811,11 +1293,11 @@ async function registerRoutes(app2) {
         // Statut par défaut
       };
       console.log("\u{1F527} Donn\xE9es finales pour insertion:", sessionDataWithOriginalType);
-      const session4 = await storage.createSession(sessionDataWithOriginalType);
-      res.status(201).json(session4);
+      const session3 = await storage.createSession(sessionDataWithOriginalType);
+      res.status(201).json(session3);
     } catch (error) {
       console.error("Error creating session:", error);
-      if (error instanceof z3.ZodError) {
+      if (error instanceof z2.ZodError) {
         return res.status(400).json({ error: error.errors });
       }
       res.status(500).json({ error: "Failed to create session" });
@@ -1824,26 +1306,26 @@ async function registerRoutes(app2) {
   app2.patch("/api/sessions/:id", isAuthenticated, async (req, res) => {
     try {
       const sessionId = parseInt(req.params.id);
-      const session4 = await storage.getSessionById(sessionId);
-      if (!session4) {
+      const session3 = await storage.getSessionById(sessionId);
+      if (!session3) {
         return res.status(404).json({ error: "Session not found" });
       }
       if (req.user.role === "TEACHER") {
-        if (session4.teacherId !== req.user.id) {
+        if (session3.teacherId !== req.user.id) {
           return res.status(403).json({ error: "Access denied" });
         }
-        if (session4.status !== "PENDING_REVIEW" && session4.status !== "PENDING_DOCUMENTS") {
+        if (session3.status !== "PENDING_REVIEW" && session3.status !== "PENDING_DOCUMENTS") {
           return res.status(403).json({ error: "Cannot update sessions that are already in review" });
         }
       } else if (req.user.role === "SECRETARY") {
-        if (req.body.status && req.body.status !== session4.status) {
+        if (req.body.status && req.body.status !== session3.status) {
           const allowedTransitions = {
             "PENDING_REVIEW": ["PENDING_VALIDATION", "PENDING_DOCUMENTS", "REJECTED"],
             "PENDING_DOCUMENTS": ["PENDING_VALIDATION", "REJECTED"],
             "VALIDATED": ["PAID"]
             // Si fonctionnalité paiement activée
           };
-          const currentStatus = session4.status;
+          const currentStatus = session3.status;
           const newStatus = req.body.status;
           if (!allowedTransitions[currentStatus] || !allowedTransitions[currentStatus].includes(newStatus)) {
             return res.status(403).json({
@@ -1852,13 +1334,13 @@ async function registerRoutes(app2) {
           }
         }
       } else if (req.user.role === "PRINCIPAL") {
-        if (req.body.status && req.body.status !== session4.status) {
+        if (req.body.status && req.body.status !== session3.status) {
           const allowedTransitions = {
             "PENDING_REVIEW": ["PENDING_VALIDATION", "PENDING_DOCUMENTS", "VALIDATED", "REJECTED"],
             "PENDING_DOCUMENTS": ["PENDING_VALIDATION", "VALIDATED", "REJECTED"],
             "PENDING_VALIDATION": ["VALIDATED", "REJECTED"]
           };
-          const currentStatus = session4.status;
+          const currentStatus = session3.status;
           const newStatus = req.body.status;
           if (!allowedTransitions[currentStatus] || !allowedTransitions[currentStatus].includes(newStatus)) {
             return res.status(403).json({
@@ -1867,7 +1349,7 @@ async function registerRoutes(app2) {
           }
         }
       } else if (req.user.role === "ADMIN") {
-        if (req.body.status && req.body.status !== session4.status) {
+        if (req.body.status && req.body.status !== session3.status) {
           return res.status(403).json({
             error: "Les administrateurs ne peuvent pas changer le statut des s\xE9ances. Cette fonctionnalit\xE9 est r\xE9serv\xE9e \xE0 la direction et au secr\xE9tariat."
           });
@@ -1875,7 +1357,7 @@ async function registerRoutes(app2) {
         const editWindowSetting = await storage.getSystemSettingByKey("SESSION_EDIT_WINDOW");
         if (editWindowSetting) {
           const editWindowMinutes = parseInt(editWindowSetting.value);
-          const creationTime = new Date(session4.createdAt).getTime();
+          const creationTime = new Date(session3.createdAt).getTime();
           const currentTime = (/* @__PURE__ */ new Date()).getTime();
           const diffMinutes = Math.floor((currentTime - creationTime) / (1e3 * 60));
           if (diffMinutes > editWindowMinutes) {
@@ -1890,8 +1372,8 @@ async function registerRoutes(app2) {
           }
         }
       }
-      if (req.body.status && req.body.status !== session4.status) {
-        await createStatusNotification(session4, req.body.status, req.body.comment);
+      if (req.body.status && req.body.status !== session3.status) {
+        await createStatusNotification(session3, req.body.status, req.body.comment);
       }
       const updatedSession = await storage.updateSession(sessionId, {
         ...req.body,
@@ -1905,19 +1387,19 @@ async function registerRoutes(app2) {
   app2.delete("/api/sessions/:id", isAuthenticated, async (req, res) => {
     try {
       const sessionId = parseInt(req.params.id);
-      const session4 = await storage.getSessionById(sessionId);
-      if (!session4) {
+      const session3 = await storage.getSessionById(sessionId);
+      if (!session3) {
         return res.status(404).json({ error: "Session not found" });
       }
       if (req.user.role === "TEACHER") {
-        if (session4.teacherId !== req.user.id) {
+        if (session3.teacherId !== req.user.id) {
           return res.status(403).json({ error: "Access denied" });
         }
-        if (session4.status !== "PENDING_REVIEW") {
+        if (session3.status !== "PENDING_REVIEW") {
           return res.status(403).json({ error: "Cannot delete sessions that are already in review" });
         }
       } else if (req.user.role === "ADMIN") {
-        if (session4.status === "VALIDATED") {
+        if (session3.status === "VALIDATED") {
           return res.status(403).json({
             error: "Les administrateurs ne peuvent pas supprimer des s\xE9ances d\xE9j\xE0 valid\xE9es. Cette op\xE9ration est r\xE9serv\xE9e \xE0 la direction."
           });
@@ -1925,7 +1407,7 @@ async function registerRoutes(app2) {
         const editWindowSetting = await storage.getSystemSettingByKey("SESSION_EDIT_WINDOW");
         if (editWindowSetting) {
           const editWindowMinutes = parseInt(editWindowSetting.value);
-          const creationTime = new Date(session4.createdAt).getTime();
+          const creationTime = new Date(session3.createdAt).getTime();
           const currentTime = (/* @__PURE__ */ new Date()).getTime();
           const diffMinutes = Math.floor((currentTime - creationTime) / (1e3 * 60));
           if (diffMinutes > editWindowMinutes) {
@@ -2160,13 +1642,13 @@ async function registerRoutes(app2) {
         delimiter: ",",
         transformHeader: (header) => header.trim().toUpperCase()
       });
-      const users4 = parseResult.data;
+      const users3 = parseResult.data;
       const headers = parseResult.meta.fields || [];
       console.log("\u2705 Parsing final r\xE9ussi!");
       console.log("\u{1F50D} En-t\xEAtes finaux:", headers);
-      console.log("\u{1F50D} Utilisateurs \xE0 importer:", users4.length);
-      if (users4.length > 0) {
-        console.log("\u{1F50D} Premier utilisateur pars\xE9:", users4[0]);
+      console.log("\u{1F50D} Utilisateurs \xE0 importer:", users3.length);
+      if (users3.length > 0) {
+        console.log("\u{1F50D} Premier utilisateur pars\xE9:", users3[0]);
       }
       let imported = 0;
       let skipped = 0;
@@ -2188,14 +1670,14 @@ async function registerRoutes(app2) {
       details.push(`\u{1F4CA} ANALYSE DU FICHIER CSV:`);
       details.push(`   S\xE9parateur: ${parseResult.meta.delimiter}`);
       details.push(`   Colonnes trouv\xE9es (${headers.length}): ${headers.join(", ")}`);
-      details.push(`   Lignes de donn\xE9es: ${users4.length}`);
+      details.push(`   Lignes de donn\xE9es: ${users3.length}`);
       details.push(`   Mapping d\xE9tect\xE9:`);
       details.push(`     LOGIN \u2192 ${columnMapping.login || "NON TROUV\xC9"}`);
       details.push(`     NOM \u2192 ${columnMapping.nom || "NON TROUV\xC9"}`);
       details.push(`     PRENOM \u2192 ${columnMapping.prenom || "NON TROUV\xC9"}`);
       details.push(`     EMAIL \u2192 ${columnMapping.email || "NON TROUV\xC9"}`);
       details.push(``);
-      for (const userData of users4) {
+      for (const userData of users3) {
         try {
           const login = columnMapping.login ? userData[columnMapping.login] : "";
           const nom = columnMapping.nom ? userData[columnMapping.nom] : "";
@@ -2262,9 +1744,9 @@ async function registerRoutes(app2) {
   app2.get("/api/admin/users", isAdmin, async (req, res) => {
     try {
       console.log("\u{1F50D} API /api/admin/users appel\xE9e par:", req.user?.username);
-      const users4 = await storage.getUsers();
-      console.log(`\u{1F4CA} ${users4.length} utilisateurs trouv\xE9s`);
-      res.json(users4);
+      const users3 = await storage.getUsers();
+      console.log(`\u{1F4CA} ${users3.length} utilisateurs trouv\xE9s`);
+      res.json(users3);
     } catch (error) {
       console.log("\u274C Erreur API /api/admin/users:", error);
       res.status(500).json({ error: "Impossible de r\xE9cup\xE9rer les utilisateurs" });
@@ -2320,11 +1802,11 @@ async function registerRoutes(app2) {
       if (!file) {
         return res.status(400).json({ error: "Aucun fichier fourni" });
       }
-      const session4 = await storage.getSessionById(sessionId);
-      if (!session4) {
+      const session3 = await storage.getSessionById(sessionId);
+      if (!session3) {
         return res.status(404).json({ error: "Session non trouv\xE9e" });
       }
-      if (req.user.role === "TEACHER" && session4.teacherId !== req.user.id) {
+      if (req.user.role === "TEACHER" && session3.teacherId !== req.user.id) {
         return res.status(403).json({ error: "Vous ne pouvez joindre des documents qu'\xE0 vos propres sessions" });
       }
       const attachmentData = {
@@ -2360,11 +1842,11 @@ async function registerRoutes(app2) {
       if (!attachment) {
         return res.status(404).json({ error: "Document non trouv\xE9" });
       }
-      const session4 = await storage.getSessionById(attachment.sessionId);
-      if (!session4) {
+      const session3 = await storage.getSessionById(attachment.sessionId);
+      if (!session3) {
         return res.status(404).json({ error: "Session associ\xE9e non trouv\xE9e" });
       }
-      if (req.user.role === "TEACHER" && session4.teacherId !== req.user.id) {
+      if (req.user.role === "TEACHER" && session3.teacherId !== req.user.id) {
         return res.status(403).json({ error: "Acc\xE8s non autoris\xE9 \xE0 ce document" });
       }
       res.download(attachment.filePath, attachment.originalName);
@@ -2412,11 +1894,11 @@ async function registerRoutes(app2) {
       if (!attachment) {
         return res.status(404).json({ error: "Document non trouv\xE9" });
       }
-      const session4 = await storage.getSessionById(attachment.sessionId);
-      if (!session4) {
+      const session3 = await storage.getSessionById(attachment.sessionId);
+      if (!session3) {
         return res.status(404).json({ error: "Session associ\xE9e non trouv\xE9e" });
       }
-      if (req.user.role === "TEACHER" && session4.teacherId !== req.user.id) {
+      if (req.user.role === "TEACHER" && session3.teacherId !== req.user.id) {
         return res.status(403).json({ error: "Vous ne pouvez supprimer que vos propres documents" });
       }
       const deleted = await storage.deleteAttachment(attachmentId);
@@ -2445,15 +1927,15 @@ async function registerRoutes(app2) {
       const teachers = await storage.getUsers({ role: "TEACHER" });
       const teachersWithStats = await Promise.all(
         teachers.map(async (teacher) => {
-          const sessions4 = await storage.getSessions({ teacherId: teacher.id });
+          const sessions3 = await storage.getSessions({ teacherId: teacher.id });
           const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
-          const currentYearSessions = sessions4.filter(
+          const currentYearSessions = sessions3.filter(
             (s) => new Date(s.date).getFullYear() === currentYear
           );
           return {
             ...teacher,
             stats: {
-              totalSessions: sessions4.length,
+              totalSessions: sessions3.length,
               currentYearSessions: currentYearSessions.length,
               rcdSessions: currentYearSessions.filter((s) => s.type === "RCD").length,
               devoirsFaitsSessions: currentYearSessions.filter((s) => s.type === "DEVOIRS_FAITS").length,
@@ -2501,14 +1983,14 @@ async function registerRoutes(app2) {
       res.status(500).json({ error: "Erreur serveur" });
     }
   });
-  async function createStatusNotification(session4, newStatus, comment) {
+  async function createStatusNotification(session3, newStatus, comment) {
     try {
       let title = "";
       let message = "";
       switch (newStatus) {
         case "PENDING_DOCUMENTS":
           title = "Pi\xE8ces jointes requises";
-          message = `Votre d\xE9claration du ${new Date(session4.date).toLocaleDateString("fr-FR")} (${session4.type}) n\xE9cessite des pi\xE8ces jointes suppl\xE9mentaires.`;
+          message = `Votre d\xE9claration du ${new Date(session3.date).toLocaleDateString("fr-FR")} (${session3.type}) n\xE9cessite des pi\xE8ces jointes suppl\xE9mentaires.`;
           if (comment) {
             message += `
 
@@ -2517,7 +1999,7 @@ Message de la secr\xE9taire : ${comment}`;
           break;
         case "REJECTED":
           title = "D\xE9claration rejet\xE9e";
-          message = `Votre d\xE9claration du ${new Date(session4.date).toLocaleDateString("fr-FR")} (${session4.type}) a \xE9t\xE9 rejet\xE9e.`;
+          message = `Votre d\xE9claration du ${new Date(session3.date).toLocaleDateString("fr-FR")} (${session3.type}) a \xE9t\xE9 rejet\xE9e.`;
           if (comment) {
             message += `
 
@@ -2526,27 +2008,27 @@ Motif : ${comment}`;
           break;
         case "PENDING_VALIDATION":
           title = "D\xE9claration transmise";
-          message = `Votre d\xE9claration du ${new Date(session4.date).toLocaleDateString("fr-FR")} (${session4.type}) a \xE9t\xE9 transmise au principal pour validation.`;
+          message = `Votre d\xE9claration du ${new Date(session3.date).toLocaleDateString("fr-FR")} (${session3.type}) a \xE9t\xE9 transmise au principal pour validation.`;
           break;
         case "VALIDATED":
           title = "D\xE9claration valid\xE9e";
-          message = `Votre d\xE9claration du ${new Date(session4.date).toLocaleDateString("fr-FR")} (${session4.type}) a \xE9t\xE9 valid\xE9e par le principal.`;
+          message = `Votre d\xE9claration du ${new Date(session3.date).toLocaleDateString("fr-FR")} (${session3.type}) a \xE9t\xE9 valid\xE9e par le principal.`;
           break;
         case "READY_FOR_PAYMENT":
           title = "Pr\xEAt pour paiement";
-          message = `Votre d\xE9claration du ${new Date(session4.date).toLocaleDateString("fr-FR")} (${session4.type}) est pr\xEAte pour le paiement.`;
+          message = `Votre d\xE9claration du ${new Date(session3.date).toLocaleDateString("fr-FR")} (${session3.type}) est pr\xEAte pour le paiement.`;
           break;
         case "PAID":
           title = "D\xE9claration pay\xE9e";
-          message = `Votre d\xE9claration du ${new Date(session4.date).toLocaleDateString("fr-FR")} (${session4.type}) a \xE9t\xE9 mise en paiement.`;
+          message = `Votre d\xE9claration du ${new Date(session3.date).toLocaleDateString("fr-FR")} (${session3.type}) a \xE9t\xE9 mise en paiement.`;
           break;
       }
       if (title && message) {
         await storage.db.execute(`
           INSERT INTO notifications (user_id, session_id, type, title, message)
           VALUES ($1, $2, $3, $4, $5)
-        `, [session4.teacherId, session4.id, newStatus, title, message]);
-        console.log(`\u{1F4EC} Notification cr\xE9\xE9e pour l'utilisateur ${session4.teacherId}: ${title}`);
+        `, [session3.teacherId, session3.id, newStatus, title, message]);
+        console.log(`\u{1F4EC} Notification cr\xE9\xE9e pour l'utilisateur ${session3.teacherId}: ${title}`);
       }
     } catch (error) {
       console.error("Erreur lors de la cr\xE9ation de la notification:", error);
