@@ -30,7 +30,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryKey: ["/api/user"],
     queryFn: async () => {
       try {
-        const res = await fetch("/api/user");
+        const token = localStorage.getItem('auth_token');
+        const headers: HeadersInit = {
+          'Content-Type': 'application/json'
+        };
+
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const res = await fetch("/api/user", { headers });
         if (res.status === 401) return null;
         if (!res.ok) throw new Error(`Erreur lors de la récupération des données: ${res.status}`);
         const data = await res.json();
@@ -51,7 +60,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       return await res.json();
     },
-    onSuccess: (user: User) => {
+    onSuccess: (response: any) => {
+      // Stocker le token si présent
+      if (response.token) {
+        localStorage.setItem('auth_token', response.token);
+      }
+
+      // Extraire les données utilisateur (sans le token)
+      const { token, ...user } = response;
+
       queryClient.setQueryData(["/api/user"], user);
       toast({
         title: "Connexion réussie",
@@ -97,6 +114,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await apiRequest("POST", "/api/logout");
     },
     onSuccess: () => {
+      // Supprimer le token du localStorage
+      localStorage.removeItem('auth_token');
       queryClient.setQueryData(["/api/user"], null);
       toast({
         title: "Déconnexion réussie",
