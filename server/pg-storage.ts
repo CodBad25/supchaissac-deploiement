@@ -239,10 +239,7 @@ export class PgStorage implements IStorage {
     }
   }
 
-  // Utility method to close the connection
-  async close(): Promise<void> {
-    await this.sql.end();
-  }
+
 
   // Method to initialize with test data (similar to MemStorage)
   async initializeTestData(): Promise<void> {

@@ -13,7 +13,7 @@ export async function setupVite(app: Express, server: Server) {
   // Dynamic imports so production never attempts to resolve vite/rollup optional deps
   const [{ createServer: createViteServer, createLogger }, { default: viteConfig }, { nanoid }] = await Promise.all([
     import("vite"),
-    import("../vite.config"),
+    import("../vite.config.ts"),
     import("nanoid"),
   ]);
 
