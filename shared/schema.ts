@@ -84,6 +84,19 @@ export const systemSettings = pgTable("system_settings", {
   updatedBy: text("updated_by"),
 });
 
+// User switcher list model (DEV TOOL - will be removed in production)
+export const userSwitcherList = pgTable("user_switcher_list", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  userName: text("user_name").notNull(),
+  userRole: userRoleEnum("user_role").notNull(),
+  userCredentials: text("user_credentials").notNull(), // JSON string with username/password
+  isDemoUser: boolean("is_demo_user").notNull().default(false),
+  isActive: boolean("is_active").notNull().default(true),
+  addedAt: timestamp("added_at").defaultNow().notNull(),
+  description: text("description"),
+});
+
 // Create insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -109,6 +122,11 @@ export const insertSystemSettingSchema = createInsertSchema(systemSettings).omit
   updatedAt: true,
 });
 
+export const insertUserSwitcherSchema = createInsertSchema(userSwitcherList).omit({
+  id: true,
+  addedAt: true,
+});
+
 // Export types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -121,6 +139,9 @@ export type TeacherSetup = typeof teacherSetups.$inferSelect;
 
 export type InsertSystemSetting = z.infer<typeof insertSystemSettingSchema>;
 export type SystemSetting = typeof systemSettings.$inferSelect;
+
+export type InsertUserSwitcher = z.infer<typeof insertUserSwitcherSchema>;
+export type UserSwitcher = typeof userSwitcherList.$inferSelect;
 
 // Time slot mappings
 export const TIME_SLOTS = {

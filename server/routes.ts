@@ -4,6 +4,7 @@ import { initializeStorage, getStorage } from "./storage-instance";
 import { setupAuth } from "./auth";
 import { z } from "zod";
 import { insertSessionSchema, insertTeacherSetupSchema, insertSystemSettingSchema } from "@shared/schema";
+import userSwitcherRouter from "./user-switcher-api";
 
 function isAuthenticated(req: Request, res: Response, next: Function) {
   if (req.isAuthenticated()) {
@@ -19,6 +20,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Set up authentication routes
   setupAuth(app);
+
+  // 🔧 DEV TOOL - User Switcher API (will be removed in production)
+  app.use("/api/user-switcher", userSwitcherRouter);
 
   // API routes
   // Sessions
@@ -369,6 +373,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedSetting);
     } catch (error) {
       res.status(500).json({ error: "Impossible de mettre à jour le paramètre" });
+    }
+  });
+
+  // Routes de gestion des utilisateurs (admin only)
+  app.get("/api/admin/users", isAdmin, async (req, res) => {
+    try {
+      console.log('🔍 API /api/admin/users appelée par:', req.user?.username);
+      const users = await storage.getUsers();
+      console.log(`📊 ${users.length} utilisateurs trouvés`);
+      res.json(users);
+    } catch (error) {
+      console.log('❌ Erreur API /api/admin/users:', error);
+      res.status(500).json({ error: "Impossible de récupérer les utilisateurs" });
+    }
+  });
+
+  app.patch("/api/admin/users/:id", isAdmin, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const { name, role, inPacte } = req.body;
+
+      const updatedUser = await storage.updateUser(userId, {
+        name,
+        role,
+        inPacte
+      });
+
+      res.json(updatedUser);
+    } catch (error) {
+      res.status(500).json({ error: "Impossible de mettre à jour l'utilisateur" });
+    }
+  });
+
+  app.delete("/api/admin/users/:id", isAdmin, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+
+      // Vérifier qu'on ne supprime pas le dernier admin
+      const user = await storage.getUserById(userId);
+      if (user?.role === 'ADMIN') {
+        const allUsers = await storage.getUsers();
+        const adminCount = allUsers.filter(u => u.role === 'ADMIN').length;
+        if (adminCount <= 1) {
+          return res.status(400).json({ error: "Impossible de supprimer le dernier administrateur" });
+        }
+      }
+
+      await storage.deleteUser(userId);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Impossible de supprimer l'utilisateur" });
     }
   });
 

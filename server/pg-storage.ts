@@ -100,6 +100,34 @@ export class PgStorage implements IStorage {
     }
   }
 
+  async getUserById(id: number): Promise<User | undefined> {
+    return this.getUser(id); // Alias pour compatibilité
+  }
+
+  async getUsers(): Promise<User[]> {
+    try {
+      const result = await this.db.select().from(users);
+      return result;
+    } catch (error) {
+      console.error('Error getting users:', error);
+      return [];
+    }
+  }
+
+  async deleteUser(id: number): Promise<boolean> {
+    try {
+      // Supprimer d'abord les configurations enseignant associées
+      await this.db.delete(teacherSetups).where(eq(teacherSetups.teacherId, id));
+
+      // Supprimer l'utilisateur
+      const result = await this.db.delete(users).where(eq(users.id, id));
+      return true;
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      return false;
+    }
+  }
+
   // Session methods
   async getSessions(): Promise<Session[]> {
     try {

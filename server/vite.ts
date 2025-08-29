@@ -11,11 +11,13 @@ import { type Server } from "http";
 // Important: load Vite and related dev-only deps lazily, only in development
 export async function setupVite(app: Express, server: Server) {
   // Dynamic imports so production never attempts to resolve vite/rollup optional deps
-  const [{ createServer: createViteServer, createLogger }, { default: viteConfig }, { nanoid }] = await Promise.all([
+  const [{ createServer: createViteServer, createLogger }, viteConfigModule, { nanoid }] = await Promise.all([
     import("vite"),
-    import("../vite.config.ts"),
+    import("../vite.config.ts").catch(() => ({ default: {} })),
     import("nanoid"),
   ]);
+
+  const viteConfig = viteConfigModule.default || {};
 
   const viteLogger = createLogger();
 

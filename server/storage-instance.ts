@@ -8,7 +8,16 @@ let storageInstance: IStorage | null = null;
 export async function initializeStorage(): Promise<IStorage> {
   if (!storageInstance) {
     storageInstance = await createStorage();
-    
+
+    // Initialiser les données de test (utilisateurs)
+    if ('initializeTestData' in storageInstance && typeof storageInstance.initializeTestData === 'function') {
+      try {
+        await storageInstance.initializeTestData();
+      } catch (error) {
+        console.error('Erreur lors de l\'initialisation des données de test:', error);
+      }
+    }
+
     // Initialiser les paramètres système par défaut
     try {
       const existingSetting = await storageInstance.getSystemSettingByKey("SESSION_EDIT_WINDOW");
@@ -24,7 +33,7 @@ export async function initializeStorage(): Promise<IStorage> {
       console.error('Erreur lors de l\'initialisation des paramètres système:', error);
     }
   }
-  
+
   return storageInstance;
 }
 
