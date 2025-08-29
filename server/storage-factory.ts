@@ -21,11 +21,12 @@ export async function createStorage(): Promise<IStorage> {
       const pgStorage = new PgStorage(databaseUrl);
       
       // Test de connexion
-      await pgStorage.initialize();
+      await pgStorage.getSystemSettings();
       
       console.log('✅ PostgreSQL connecté avec succès');
       
-      // Les données de test seront gérées par le système hybride
+      // Initialiser les données de test si nécessaire
+      await pgStorage.initializeTestData();
       
       return pgStorage;
     } catch (error) {

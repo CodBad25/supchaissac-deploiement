@@ -29,11 +29,9 @@ export const sessionTypeEnum = pgEnum('session_type', ['RCD', 'DEVOIRS_FAITS', '
 // Session status enum
 export const sessionStatusEnum = pgEnum('session_status', [
   'PENDING_REVIEW',      // Just created by teacher
-  'PENDING_DOCUMENTS',   // Waiting for attachments from teacher
   'PENDING_VALIDATION',  // Verified by secretary, waiting for principal
   'VALIDATED',           // Validated by principal
   'REJECTED',            // Rejected by secretary or principal
-  'READY_FOR_PAYMENT',   // Ready to be processed for payment
   'PAID'                 // Marked as paid by secretary
 ]);
 

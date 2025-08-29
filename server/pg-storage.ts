@@ -2,54 +2,48 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { eq, and } from "drizzle-orm";
 import session from "express-session";
-import {
-  users,
-  sessions,
-  teacherSetups,
+import ConnectPgSimple from "connect-pg-simple";
+import { Pool } from "pg";
+import { 
+  users, 
+  sessions, 
+  teacherSetups, 
   systemSettings,
-  attachments,
-  User,
-  InsertUser,
-  Session,
-  InsertSession,
-  TeacherSetup,
+  User, 
+  InsertUser, 
+  Session, 
+  InsertSession, 
+  TeacherSetup, 
   InsertTeacherSetup,
   SystemSetting,
-  InsertSystemSetting,
-  Attachment,
-  InsertAttachment
-} from "@shared/schema-pg";
+  InsertSystemSetting
+} from "@shared/schema";
 import { IStorage } from "./storage";
 
-// Utilisation temporaire du store en mémoire pour éviter les conflits
+const PgSession = ConnectPgSimple(session);
 
 export class PgStorage implements IStorage {
   private db: ReturnType<typeof drizzle>;
   private sql: ReturnType<typeof postgres>;
+  private pgPool: Pool;
   public sessionStore: any;
 
   constructor(databaseUrl: string) {
     // Create PostgreSQL connection
     this.sql = postgres(databaseUrl);
     this.db = drizzle(this.sql);
-    
-    // Store de sessions en mémoire (temporaire pour éviter les conflits)
-    this.sessionStore = new session.MemoryStore();
-  }
 
-  // 🔄 Initialisation des tables
-  async initialize(): Promise<void> {
-    try {
-      console.log("🔧 Vérification des tables PostgreSQL...");
+    // Create separate pg pool for sessions
+    this.pgPool = new Pool({
+      connectionString: databaseUrl,
+    });
 
-      // Test de connexion simple
-      await this.sql`SELECT 1`;
-
-      console.log("✅ PostgreSQL initialisé avec succès");
-    } catch (error) {
-      console.error("❌ Erreur initialisation PostgreSQL:", error);
-      throw error;
-    }
+    // Create session store for PostgreSQL
+    this.sessionStore = new PgSession({
+      pool: this.pgPool,
+      tableName: 'session', // Use 'session' table for storing sessions
+      createTableIfMissing: true,
+    });
   }
 
   // User methods
@@ -103,34 +97,6 @@ export class PgStorage implements IStorage {
     } catch (error) {
       console.error('Error updating user:', error);
       return undefined;
-    }
-  }
-
-  async getUserById(id: number): Promise<User | undefined> {
-    return this.getUser(id); // Alias pour compatibilité
-  }
-
-  async getUsers(): Promise<User[]> {
-    try {
-      const result = await this.db.select().from(users);
-      return result;
-    } catch (error) {
-      console.error('Error getting users:', error);
-      return [];
-    }
-  }
-
-  async deleteUser(id: number): Promise<boolean> {
-    try {
-      // Supprimer d'abord les configurations enseignant associées
-      await this.db.delete(teacherSetups).where(eq(teacherSetups.userId, id));
-
-      // Supprimer l'utilisateur
-      const result = await this.db.delete(users).where(eq(users.id, id));
-      return true;
-    } catch (error) {
-      console.error('Error deleting user:', error);
-      return false;
     }
   }
 
@@ -351,83 +317,12 @@ export class PgStorage implements IStorage {
     }
   }
 
-  // 📎 MÉTHODES POUR LES DOCUMENTS JOINTS
-
-  async getAttachmentsBySession(sessionId: number): Promise<Attachment[]> {
+  async close(): Promise<void> {
     try {
-      const result = await this.db.select().from(attachments).where(eq(attachments.sessionId, sessionId));
-      return result;
+      await this.sql.end();
+      await this.pgPool.end();
     } catch (error) {
-      console.error('Error getting attachments by session:', error);
-      return [];
-    }
-  }
-
-  async getAttachmentById(id: number): Promise<Attachment | undefined> {
-    try {
-      const result = await this.db.select().from(attachments).where(eq(attachments.id, id)).limit(1);
-      return result[0];
-    } catch (error) {
-      console.error('Error getting attachment by id:', error);
-      return undefined;
-    }
-  }
-
-  async createAttachment(attachmentData: InsertAttachment): Promise<Attachment> {
-    try {
-      const result = await this.db.insert(attachments).values(attachmentData).returning();
-      return result[0];
-    } catch (error) {
-      console.error('Error creating attachment:', error);
-      throw error;
-    }
-  }
-
-  async updateAttachment(id: number, data: Partial<Attachment>): Promise<Attachment | undefined> {
-    try {
-      const result = await this.db.update(attachments).set(data).where(eq(attachments.id, id)).returning();
-      return result[0];
-    } catch (error) {
-      console.error('Error updating attachment:', error);
-      return undefined;
-    }
-  }
-
-  async deleteAttachment(id: number): Promise<boolean> {
-    try {
-      const result = await this.db.delete(attachments).where(eq(attachments.id, id)).returning();
-      return result.length > 0;
-    } catch (error) {
-      console.error('Error deleting attachment:', error);
-      return false;
-    }
-  }
-
-  async verifyAttachment(id: number, verifiedBy: number): Promise<Attachment | undefined> {
-    try {
-      const result = await this.db.update(attachments).set({
-        isVerified: true,
-        verifiedBy,
-        verifiedAt: new Date()
-      }).where(eq(attachments.id, id)).returning();
-      return result[0];
-    } catch (error) {
-      console.error('Error verifying attachment:', error);
-      return undefined;
-    }
-  }
-
-  async archiveAttachment(id: number, archivedBy: number): Promise<Attachment | undefined> {
-    try {
-      const result = await this.db.update(attachments).set({
-        isArchived: true,
-        archivedBy,
-        archivedAt: new Date()
-      }).where(eq(attachments.id, id)).returning();
-      return result[0];
-    } catch (error) {
-      console.error('Error archiving attachment:', error);
-      return undefined;
+      console.error('Error closing connections:', error);
     }
   }
 }

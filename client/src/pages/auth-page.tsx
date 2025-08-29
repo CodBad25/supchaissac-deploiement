@@ -19,33 +19,6 @@ const DEMO_USERS = [
     color: "bg-emerald-600"
   },
   {
-    id: "teacherWithPacte",
-    label: "Marie Petit (Enseignante avec pacte)",
-    credentials: {
-      username: "teacher2@example.com",
-      password: "password123"
-    },
-    color: "bg-blue-600"
-  },
-  {
-    id: "teacherWithoutPacte2",
-    label: "Martin Dubois (Enseignant sans pacte)",
-    credentials: {
-      username: "teacher3@example.com",
-      password: "password123"
-    },
-    color: "bg-purple-600"
-  },
-  {
-    id: "teacherWithPacte2",
-    label: "Philippe Garcia (Enseignant avec pacte)",
-    credentials: {
-      username: "teacher4@example.com",
-      password: "password123"
-    },
-    color: "bg-indigo-600"
-  },
-  {
     id: "secretary",
     label: "Laure Martin (Secrétariat)",
     credentials: {
